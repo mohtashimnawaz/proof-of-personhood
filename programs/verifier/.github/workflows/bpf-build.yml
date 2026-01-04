@@ -37,10 +37,10 @@ jobs:
           rustc --version
           cargo --version
 
-      - name: Prebuild check: cargo metadata (nightly +Z)
+      - name: "Prebuild check: cargo metadata (nightly +Z)"
         run: |
           cargo +nightly -Z next-lockfile-bump metadata --no-deps
-      - name: Prebuild: standard cargo build (nightly +Z)
+      - name: "Prebuild: standard cargo build (nightly +Z)"
         run: |
           cargo +nightly -Z next-lockfile-bump build --manifest-path ./programs/verifier/Cargo.toml --release
       - name: Build verifier program for BPF
