@@ -12,22 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Solana CLI (community action)
-        uses: metadaoproject/setup-solana@v1.0
-        with:
-          solana-cli-version: '1.21.14'
-
-      - name: Add Solana to PATH and verify
+      - name: Install Solana CLI manually
         run: |
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
-          if command -v solana >/dev/null; then
-            solana --version
-          else
-            echo "Solana still not found after setup action" >&2
-            ls -la "$HOME/.local/share/solana/install/active_release/bin" || echo "Directory does not exist"
-            exit 1
-          fi
+          sh -c "$(curl -sSfL https://github.com/solana-labs/solana/releases/download/v1.21.14/solana-release-x86_64-unknown-linux-gnu.tar.bz2 | tar jxf - -C /tmp/)"
+          export PATH="/tmp/solana-release/bin:$PATH"
+          echo "/tmp/solana-release/bin" >> $GITHUB_PATH
+          solana --version
 
       - name: Setup rust toolchain
         uses: actions-rs/toolchain@v1
