@@ -1,0 +1,32 @@
+name: BPF Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-bpf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Solana CLI & BPF toolchain
+        run: |
+          set -e
+          curl -sSfL https://release.solana.com/v1.21.14/install | sh
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          solana --version
+
+      - name: Setup rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rust-src
+
+      - name: Build verifier program for BPF
+        run: |
+          cd programs/verifier
+          cargo build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
