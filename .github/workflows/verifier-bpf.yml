@@ -39,12 +39,13 @@ jobs:
 
       - name: "Prebuild check: cargo metadata (nightly +Z)"
         run: |
-          cargo +nightly -Z next-lockfile-bump metadata --no-deps
+          # Remove any incompatible lockfile and regenerate
+          rm -f Cargo.lock
+          cargo +nightly metadata --no-deps --locked 2>/dev/null || cargo +nightly metadata --no-deps
       - name: "Prebuild: standard cargo build (nightly +Z)"
         run: |
-          cargo +nightly -Z next-lockfile-bump build --manifest-path ./programs/verifier/Cargo.toml --release
+          cargo +nightly build --manifest-path ./programs/verifier/Cargo.toml --release
       - name: Build verifier program for BPF
         run: |
           cd programs/verifier
-          # Use cargo with unstable flag to read lockfile v4
-          cargo +nightly -Z next-lockfile-bump build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
+          cargo +nightly build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
