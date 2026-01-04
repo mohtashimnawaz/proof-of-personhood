@@ -9,10 +9,16 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 solana-program = "^1.21.4"
 thiserror = "1.0"
-# We'll add arkworks/groth16 deps as part of feasibility step and enable no_std features as needed
+# arkworks dependencies for Groth16 (minimal, no default features)
+ark-ff = { version = "0.4", default-features = false }
+ark-ec = { version = "0.4", default-features = false }
+ark-serialize = { version = "0.4", default-features = false }
+ark-groth16 = { version = "0.3", default-features = false }
+ark-bn254 = { version = "0.3", default-features = false }
 
 [features]
-default = ["realloc"]n
+default = ["realloc"]
+
 [dependencies.realloc]
 version = "0.1"
 optional = true
