@@ -47,5 +47,7 @@ jobs:
           cargo +nightly build --manifest-path ./programs/verifier/Cargo.toml --release
       - name: Build verifier program for BPF
         run: |
+          # Remove lockfile immediately before BPF build to avoid version conflicts
+          rm -f Cargo.lock programs/verifier/Cargo.lock
           cd programs/verifier
           cargo +nightly build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
