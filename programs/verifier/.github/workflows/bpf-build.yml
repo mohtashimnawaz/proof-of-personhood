@@ -23,10 +23,10 @@ jobs:
           export PATH="/tmp/solana-release/bin:$PATH"
           solana --version
 
-      - name: Setup rust toolchain
+      - name: Setup rust toolchain (use nightly to support lockfile v4)
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           override: true
           components: rust-src
 
