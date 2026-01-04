@@ -12,10 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Solana CLI (official action)
-        uses: solana-labs/setup-solana@v1
+      - name: Setup Solana CLI (community action)
+        uses: metadaoproject/setup-solana@v1
         with:
-          version: '1.21.14'
+          solana-cli-version: '1.21.14'
 
       - name: Verify solana and fallback installer
         run: |
