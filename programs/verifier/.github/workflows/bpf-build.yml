@@ -50,4 +50,4 @@ jobs:
           # Remove lockfile immediately before BPF build to avoid version conflicts
           rm -f Cargo.lock programs/verifier/Cargo.lock
           cd programs/verifier
-          cargo +nightly build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
+          cargo build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
