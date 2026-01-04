@@ -12,15 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Solana CLI from archive
+      - name: Install Solana CLI from GitHub releases
         run: |
-          SOLANA_VERSION="v1.21.14"
+          SOLANA_VERSION="v1.18.26"
           cd /tmp
           wget -q "https://github.com/solana-labs/solana/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" -O solana-release.tar.bz2
           tar jxf solana-release.tar.bz2
           echo "/tmp/solana-release/bin" >> $GITHUB_PATH
           export PATH="/tmp/solana-release/bin:$PATH"
           solana --version
+          cargo build-bpf --version
 
       - name: Setup rust toolchain
         uses: actions-rs/toolchain@v1
