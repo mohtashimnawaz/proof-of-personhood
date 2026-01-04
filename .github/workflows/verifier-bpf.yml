@@ -12,11 +12,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Solana CLI & BPF toolchain
+      - name: Install Solana CLI & BPF toolchain (robust)
         run: |
-          set -e
-          curl -sSfL https://release.solana.com/v1.21.14/install | sh
+          set -euo pipefail
+          RELEASE_URL="https://release.solana.com/v1.21.14/install"
+          # Retry download a few times to mitigate transient network issues
+          for i in 1 2 3; do
+            if curl -sSfL "$RELEASE_URL" -o /tmp/solana-install.sh; then
+              echo "Downloaded solana install script" && break
+            fi
+            echo "Download failed (attempt $i). Retrying in 5s..."
+            sleep 5
+          done
+          if [ ! -f /tmp/solana-install.sh ]; then
+            echo "Failed to download Solana install script after retries" >&2
+            exit 1
+          fi
+          chmod +x /tmp/solana-install.sh
+          /tmp/solana-install.sh
           export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+          if ! command -v solana >/dev/null; then
+            echo "solana command not found after install" >&2
+            exit 1
+          fi
           solana --version
 
       - name: Setup rust toolchain
