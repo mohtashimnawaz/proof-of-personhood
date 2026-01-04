@@ -17,38 +17,17 @@ jobs:
         with:
           solana-cli-version: '1.21.14'
 
-      - name: Verify solana and fallback installer
+      - name: Add Solana to PATH and verify
         run: |
-          set -euo pipefail
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           if command -v solana >/dev/null; then
-            echo "solana already installed"
             solana --version
-            exit 0
-          fi
-          echo "solana not found, attempting wget fallback with SSL workaround..."
-          RELEASE_URL="https://release.solana.com/v1.21.14/install"
-          if wget --no-check-certificate -q -O /tmp/solana-install.sh "$RELEASE_URL"; then
-            chmod +x /tmp/solana-install.sh
-            /tmp/solana-install.sh
-            export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
           else
-            echo "wget failed, trying curl with retries..."
-            for i in 1 2; do
-              if curl -k -sSfL "$RELEASE_URL" -o /tmp/solana-install.sh; then
-                chmod +x /tmp/solana-install.sh
-                /tmp/solana-install.sh
-                export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
-                break
-              fi
-              echo "Download failed (attempt $i). Retrying..."
-              sleep 3
-            done
-          fi
-          if ! command -v solana >/dev/null; then
-            echo "solana installation failed - all methods exhausted" >&2
+            echo "Solana still not found after setup action" >&2
+            ls -la "$HOME/.local/share/solana/install/active_release/bin" || echo "Directory does not exist"
             exit 1
           fi
-          solana --version
 
       - name: Setup rust toolchain
         uses: actions-rs/toolchain@v1
