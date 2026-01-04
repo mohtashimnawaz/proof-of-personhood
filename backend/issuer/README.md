@@ -7,7 +7,12 @@ Features:
 - `GET /health` - health check
 - `GET /keys` - returns the issuer public key
 - `POST /issue` - issues a signed credential (JSON + ed25519 signature)
-- Placeholder endpoints for blinded BBS+ flow: `/issue/blind-init` and `/issue/blind-sign` (501 Not Implemented)
+- **BBS+ endpoints (prototype)**:
+  - `GET /bbs/keys` - returns the issuer BLS public key (hex)
+  - `POST /bbs/issue` - issues a credential signed with **BBS+** (non-blinded flow in this prototype)
+  - `POST /bbs/verify` - verifies a credential + BBS+ signature
+
+Blinded issuance (for selective disclosure) is **not implemented yet** and will be added in a follow-up task.
 
 Run locally:
 - npm install

@@ -14,6 +14,7 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "noble-ed25519": "^1.7.1",
+    "@mattrglobal/bbs-signatures": "^0.3.1",
     "dotenv": "^16.0.3"
   },
   "devDependencies": {
