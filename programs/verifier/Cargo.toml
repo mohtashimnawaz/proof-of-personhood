@@ -1,0 +1,23 @@
+[package]
+name = "verifier"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+solana-program = "^1.21.4"
+thiserror = "1.0"
+# We'll add arkworks/groth16 deps as part of feasibility step and enable no_std features as needed
+
+[features]
+default = ["realloc"]n
+[dependencies.realloc]
+version = "0.1"
+optional = true
+
+[profile.release]
+opt-level = "s"
+strip = "debuginfo"
+panic = "abort"
