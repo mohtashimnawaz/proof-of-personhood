@@ -122,9 +122,11 @@ jobs:
           # Ensure correct Anchor CLI is installed (cargo install from repo tag preferred, fallback to npm)
           # Prefer cargo install from repo tag (specify package) and fallback to npm
           cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked || npm i -g @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(which anchor)" || true
-          anchor --version
+          # Capture anchor version output (stdout+stderr) to avoid failing on non-zero exit codes
+          anchor --version 2>&1 | tee anchor_version.txt || true
           # Confirm we have a compatible version (0.31.x or 0.32.x)
-          anchor --version | grep -E "anchor-cli (0\.(31|32)\.)" || (anchor --version && exit 1)
+          grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || (cat anchor_version.txt && exit 1)
+          rm -f anchor_version.txt
           CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build
           # Try deploy; if it fails (already deployed), continue
           anchor deploy --provider.cluster localnet || true
