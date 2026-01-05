@@ -50,5 +50,9 @@ jobs:
 
       - name: Build verifier program (Anchor)
         run: |
+          # Ensure correct Anchor CLI is installed (cargo install preferred, fallback to npm)
+          cargo install --locked anchor-cli --version 0.31.2 || npm i -g @coral-xyz/anchor-cli@0.31.2
+          anchor --version
+          anchor --version | grep "anchor-cli 0.31.2" || (anchor --version && exit 1)
           # Run anchor build at workspace root and output SBF to the program dist directory
           CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build -- --sbf-out-dir ./programs/verifier/dist

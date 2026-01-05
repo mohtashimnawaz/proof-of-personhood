@@ -119,6 +119,11 @@ jobs:
           set -euxo pipefail
           export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899
           export ANCHOR_WALLET=deploy_keypair.json
+          # Ensure correct Anchor CLI is installed (cargo install preferred, fallback to npm)
+          cargo install --locked anchor-cli --version 0.31.2 || npm i -g @coral-xyz/anchor-cli@0.31.2
+          anchor --version
+          # Confirm we have the expected version
+          anchor --version | grep "anchor-cli 0.31.2" || (anchor --version && exit 1)
           CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build
           # Try deploy; if it fails (already deployed), continue
           anchor deploy --provider.cluster localnet || true
