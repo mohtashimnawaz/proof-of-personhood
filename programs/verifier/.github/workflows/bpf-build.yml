@@ -45,17 +45,18 @@ jobs:
 
       - name: Install Anchor CLI
         run: |
-          npm install -g @coral-xyz/anchor-cli@0.31.2
-          anchor --version
+          # Install preferred anchor binary (cargo preferred, fallback to npm) and report version
+          cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked || npm i -g @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(which anchor)" || true
+          export ANCHOR_BIN="$HOME/.cargo/bin/anchor"
+          if [ ! -x "$ANCHOR_BIN" ]; then
+            ANCHOR_BIN="$(command -v anchor || true)"
+          fi
+          echo "Using anchor binary: $ANCHOR_BIN"
+          "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt || true
+          grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || (cat anchor_version.txt && exit 1)
+          rm -f anchor_version.txt
 
       - name: Build verifier program (Anchor)
         run: |
-          # Prefer cargo install from repo tag (specify package) and fallback to npm
-          cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked || npm i -g @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(which anchor)" || true
-          # Capture anchor version output (stdout+stderr) to avoid failing on non-zero exit codes
-          anchor --version 2>&1 | tee anchor_version.txt || true
-          # Accept either 0.31.x or 0.32.x
-          grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || (cat anchor_version.txt && exit 1)
-          rm -f anchor_version.txt
           # Run anchor build at workspace root and output SBF to the program dist directory
-          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build -- --sbf-out-dir ./programs/verifier/dist
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build -- --sbf-out-dir ./programs/verifier/dist
