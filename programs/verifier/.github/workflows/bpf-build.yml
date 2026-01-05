@@ -50,8 +50,8 @@ jobs:
 
       - name: Build verifier program (Anchor)
         run: |
-          # Ensure correct Anchor CLI is installed (cargo install preferred, fallback to npm)
-          cargo install --locked anchor-cli --version 0.31.2 || npm i -g @coral-xyz/anchor-cli@0.31.2
+          # Ensure correct Anchor CLI is installed (cargo install from repo tag preferred, fallback to npm)
+          cargo install --git https://github.com/coral-xyz/anchor --tag v0.31.2 --locked --bin anchor-cli || npm i -g @coral-xyz/anchor-cli@0.31.2
           anchor --version
           anchor --version | grep "anchor-cli 0.31.2" || (anchor --version && exit 1)
           # Run anchor build at workspace root and output SBF to the program dist directory
