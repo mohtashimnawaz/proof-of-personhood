@@ -36,8 +36,10 @@ jobs:
           rustup show
           rustc --version
           cargo --version
+          echo "unstable-options = true" >> ~/.cargo/config.toml
+          echo "next-lockfile-bump = true" >> ~/.cargo/config.toml
 
       - name: Build verifier program for BPF
         run: |
           cd programs/verifier
-          cargo build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true cargo build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
