@@ -39,10 +39,5 @@ jobs:
 
       - name: Build verifier program for BPF
         run: |
-          set -euxo pipefail
-          # Ensure lockfile is removed before build
-          rm -fv Cargo.lock || true
           cd programs/verifier
-          rm -fv Cargo.lock || true
-          # Use -Z next-lockfile-bump to allow cargo to handle v4 lockfiles
-          RUSTFLAGS="-Z next-lockfile-bump" cargo build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
+          cargo build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
