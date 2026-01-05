@@ -14,14 +14,14 @@ jobs:
 
       - name: Install Solana CLI from GitHub releases
         run: |
-          SOLANA_VERSION="v1.18.26"
+          SOLANA_VERSION="v2.1.7"
           cd /tmp
           wget -q "https://github.com/solana-labs/solana/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" -O solana-release.tar.bz2
           tar jxf solana-release.tar.bz2
           echo "/tmp/solana-release/bin" >> $GITHUB_PATH
           export PATH="/tmp/solana-release/bin:$PATH"
           solana --version
-          cargo build-bpf --version
+          cargo build-sbf --version
 
       - name: Setup rust toolchain (use nightly to support lockfile v4)
         uses: actions-rs/toolchain@v1
@@ -46,7 +46,7 @@ jobs:
           cd programs/verifier
           # Override any toolchain files to ensure we use the nightly version
           export RUSTUP_TOOLCHAIN=nightly-2024-12-01
-          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true cargo build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true cargo build-sbf --manifest-path ./Cargo.toml --sbf-out-dir ./dist
           # Restore the toolchain file
           cd ../..
           mv rust-toolchain.toml.bak rust-toolchain.toml
