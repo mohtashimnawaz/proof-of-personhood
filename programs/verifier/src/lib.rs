@@ -1,9 +1,8 @@
 use solana_program::{account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, pubkey::Pubkey, msg, program_error::ProgramError};
-use ark_bn254::Bn254;
+use ark_bn254::{Bn254, Fr};
 use ark_groth16::{Proof, VerifyingKey, verify_proof};
-use ark_ff::PrimeField;
 use ark_serialize::CanonicalDeserialize;
-
+use ark_ff::PrimeField;
 #[derive(Debug)]
 pub enum VerifierError {
     InvalidInstruction,
@@ -38,45 +37,40 @@ pub fn process_instruction(_program_id: &Pubkey, _accounts: &[AccountInfo], inst
         return Err(VerifierError::InvalidInstruction.into());
     }
 
-    // Parse components from instruction data
-    let vk_bytes = &instruction_data[0..248];
-    let proof_bytes = &instruction_data[248..376];
-    let public_inputs_bytes = &instruction_data[376..];
+    // Use a cursor to sequentially deserialize vk, proof, and public inputs
+    let mut cursor = std::io::Cursor::new(instruction_data);
 
     // Deserialize verifying key
-    let vk: VerifyingKey<Bn254> = CanonicalDeserialize::deserialize_unchecked(vk_bytes)
+    let vk = <VerifyingKey<Bn254> as ark_serialize::CanonicalDeserialize>::deserialize_uncompressed(&mut cursor)
         .map_err(|_| {
             msg!("Failed to deserialize verifying key");
             VerifierError::DeserializationFailed
         })?;
 
     // Deserialize proof
-    let proof: Proof<Bn254> = CanonicalDeserialize::deserialize_unchecked(proof_bytes)
+    let proof = <Proof<Bn254> as ark_serialize::CanonicalDeserialize>::deserialize_uncompressed(&mut cursor)
         .map_err(|_| {
             msg!("Failed to deserialize proof");
             VerifierError::InvalidProofFormat
         })?;
 
-    // Deserialize public inputs (each is a field element)
+    // Deserialize public inputs until EOF
     let mut public_inputs = Vec::new();
-    let mut cursor = 0usize;
-    while cursor < public_inputs_bytes.len() {
-        let remaining = &public_inputs_bytes[cursor..];
-        let fe = <Bn254 as ark_ff::Field>::deserialize_unchecked(remaining)
+    while (cursor.position() as usize) < instruction_data.len() {
+        let fe = <Fr as ark_serialize::CanonicalDeserialize>::deserialize_uncompressed(&mut cursor)
             .map_err(|_| {
-                msg!("Failed to deserialize public input at offset {}", cursor);
+                msg!("Failed to deserialize public input at offset {}", cursor.position());
                 VerifierError::DeserializationFailed
             })?;
-        // serialize_unchecked doesn't tell us exact bytes read; we can compute canonical size via field size
-        // For BN254 Fr, serialized size is 32 bytes. Advance by 32.
-        cursor += 32;
         public_inputs.push(fe);
     }
 
     msg!("Verifying proof with {} public inputs", public_inputs.len());
 
-    // Perform Groth16 verification
-    let is_valid = verify_proof(&vk, &proof, &public_inputs)
+    // Prepare verifying key and perform Groth16 verification
+    use ark_groth16::prepare_verifying_key;
+    let pvk = prepare_verifying_key(&vk);
+    let is_valid = verify_proof(&pvk, &proof, &public_inputs)
         .map_err(|_| {
             msg!("Proof verification failed");
             VerifierError::VerificationFailed
@@ -89,4 +83,11 @@ pub fn process_instruction(_program_id: &Pubkey, _accounts: &[AccountInfo], inst
         msg!("Proof verification returned false");
         Err(VerifierError::VerificationFailed.into())
     }
+}
+
+/// Helper for native verification (used in tests and by higher-level callers)
+pub fn verify_groth16_native(vk: &VerifyingKey<Bn254>, proof: &Proof<Bn254>, public_inputs: &[Fr]) -> Result<bool, VerifierError> {
+    use ark_groth16::prepare_verifying_key;
+    let pvk = prepare_verifying_key(vk);
+    verify_proof(&pvk, proof, public_inputs).map_err(|_| VerifierError::VerificationFailed)
 }

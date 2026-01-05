@@ -1,14 +1,13 @@
 use anyhow::Result;
-use ark_bn254::Bn254;
-use ark_groth16::{generate_random_parameters, create_random_proof, prepare_verifying_key, verify_proof, Proof, VerifyingKey};
-use ark_relations::r1cs::ConstraintSynthesizer;
-use ark_relations::r1cs::ConstraintSystemRef;
-use ark_relations::r1cs::SynthesisError;
+use ark_bn254::{Bn254, Fr};
+use ark_groth16::{generate_random_parameters, create_random_proof};
+use ark_relations::r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use ark_r1cs_std::alloc::AllocVar;
-use ark_ff::UniformRand;
+use ark_r1cs_std::fields::fp::FpVar;
+use ark_r1cs_std::eq::EqGadget;
 use ark_serialize::CanonicalSerialize;
-use std::io::Write;
 use std::fs::File;
+use rand::Rng;
 
 #[derive(Clone)]
 struct SimpleCircuit {
@@ -16,13 +15,12 @@ struct SimpleCircuit {
     pub b: u64,
 }
 
-impl ConstraintSynthesizer<<Bn254 as ark_ff::Field>::Fr> for SimpleCircuit {
-    fn generate_constraints(self, cs: ConstraintSystemRef<<Bn254 as ark_ff::Field>::Fr>) -> Result<(), SynthesisError> {
-        use ark_r1cs_std::fields::fp::FpVar;
-        let a_var = FpVar::new_input(cs.clone(), || Ok(<Bn254 as ark_ff::Field>::from(self.a))).unwrap();
-        let b_var = FpVar::new_witness(cs.clone(), || Ok(<Bn254 as ark_ff::Field>::from(self.b))).unwrap();
+impl ConstraintSynthesizer<Fr> for SimpleCircuit {
+    fn generate_constraints(self, cs: ConstraintSystemRef<Fr>) -> Result<(), SynthesisError> {
+        let a_var = FpVar::new_input(cs.clone(), || Ok(Fr::from(self.a))).unwrap();
+        let b_var = FpVar::new_witness(cs.clone(), || Ok(Fr::from(self.b))).unwrap();
         let prod = &a_var * &b_var;
-        let expected = FpVar::new_input(cs, || Ok(<Bn254 as ark_ff::Field>::from(self.a * self.b))).unwrap();
+        let expected = FpVar::new_input(cs, || Ok(Fr::from(self.a * self.b))).unwrap();
         prod.enforce_equal(&expected)?;
         Ok(())
     }
@@ -49,8 +47,8 @@ fn main() -> Result<()> {
 
     let mut pub_file = File::create("public_inputs.bin")?;
     // public inputs: a and a*b
-    let fr_a = <Bn254 as ark_ff::Field>::from(3u64);
-    let fr_ab = <Bn254 as ark_ff::Field>::from(33u64);
+    let fr_a = Fr::from(3u64);
+    let fr_ab = Fr::from(33u64);
     fr_a.serialize_unchecked(&mut pub_file)?;
     fr_ab.serialize_unchecked(&mut pub_file)?;
 
