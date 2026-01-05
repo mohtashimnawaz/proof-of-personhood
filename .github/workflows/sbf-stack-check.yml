@@ -33,7 +33,7 @@ jobs:
         run: |
           # Try cargo install first (matches local dev); fallback to npm if not available
           if ! command -v anchor >/dev/null 2>&1; then
-            cargo install --locked anchor-cli --version 0.32.1 || npm i -g @coral-xyz/anchor-cli
+            cargo install --locked anchor-cli --version 0.31.2 || npm i -g @coral-xyz/anchor-cli@0.31.2
           fi
           anchor --version || true
 
