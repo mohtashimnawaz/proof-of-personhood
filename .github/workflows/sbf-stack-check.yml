@@ -1,0 +1,58 @@
+name: SBF stack regression check
+
+on:
+  pull_request:
+  push:
+    branches: [ main, 'ci/**', 'sbf/**' ]
+
+jobs:
+  sbf-stack-check:
+    name: SBF Stack Regression Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Install Node.js (for Anchor if needed)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Solana CLI
+        run: |
+          curl -sSfL https://release.solana.com/stable/install | sh
+          echo "${HOME}/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install Anchor CLI
+        run: |
+          # Try cargo install first (matches local dev); fallback to npm if not available
+          if ! command -v anchor >/dev/null 2>&1; then
+            cargo install --locked anchor-cli --version 0.32.1 || npm i -g @coral-xyz/anchor-cli
+          fi
+          anchor --version || true
+
+      - name: Run anchor build and check SBF stack usage
+        env:
+          RUSTFLAGS: "-C target-cpu=native"
+        run: |
+          set -o pipefail
+          anchor build 2>&1 | tee build.log || true
+          if grep -E "Stack offset of [0-9]+ exceeded max offset of 4096" build.log; then
+            echo "SBF stack regression detected:" >&2
+            grep -nE "Stack offset of [0-9]+ exceeded max offset of 4096" build.log >&2
+            exit 1
+          fi
+
+      - name: (Optional) Run Anchor tests
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          # Run quick tests but keep failure of this step from being fatal to the stack check job
+          set -o pipefail
+          anchor test --skip-lint 2>&1 | tee test.log || true
+          echo "Tests finished."
