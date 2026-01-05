@@ -69,28 +69,12 @@ pub fn process_instruction(_program_id: &Pubkey, _accounts: &[AccountInfo], inst
 
     // Prepare verifying key and perform Groth16 verification
     use ark_groth16::prepare_verifying_key;
-
-    // On BPF (Solana), the heavy pairing/final-exponentiation code can exceed the
-    // SBF stack limits in downstream crates (arkworks). As a pragmatic short-term
-    // workaround for local CI/tests we use a lightweight stub that accepts the
-    // proof shape. Replace this with a full verifier optimized for SBF before
-    // production deployment.
-    #[cfg(target_os = "solana")]
-    let is_valid: bool = {
-        // Quick sanity check: ensure sizes roughly match expected (vk + proof + inputs)
-        // If you want stricter checks, add more lightweight validations here.
-        true
-    };
-
-    #[cfg(not(target_os = "solana"))]
-    let is_valid: bool = {
-        let pvk = prepare_verifying_key(&vk);
-        verify_proof(&pvk, &proof, &public_inputs)
-            .map_err(|_| {
-                msg!("Proof verification failed");
-                VerifierError::VerificationFailed
-            })?
-    };
+    let pvk = prepare_verifying_key(&vk);
+    let is_valid = verify_proof(&pvk, &proof, &public_inputs)
+        .map_err(|_| {
+            msg!("Proof verification failed");
+            VerifierError::VerificationFailed
+        })?;
 
     if is_valid {
         msg!("Proof verified successfully");
