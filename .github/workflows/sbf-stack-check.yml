@@ -31,13 +31,20 @@ jobs:
 
       - name: Install Anchor CLI
         run: |
-          # Try cargo install from repo tag first; fallback to npm if not available
+          set -euo pipefail
+          # Prefer cargo-installed anchor from a known tag; fallback to npm
+          export PATH="$HOME/.cargo/bin:$PATH"
           if ! command -v anchor >/dev/null 2>&1; then
             cargo install --git https://github.com/coral-xyz/anchor --tag v0.31.1 --locked --bin anchor-cli || npm i -g @coral-xyz/anchor-cli@0.31.1
+            chmod +x "$(command -v anchor)" || true
           fi
+          # Ensure cargo bin directory is available in subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          ANCHOR_BIN="$(command -v anchor || true)"
+          echo "anchor binary: $ANCHOR_BIN"
           # Capture anchor version output (stdout+stderr) to avoid failing on non-zero exit codes
-          anchor --version 2>&1 | tee anchor_version.txt || true
-          grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || anchor --version || true
+          "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt || true
+          grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || (cat anchor_version.txt && "$ANCHOR_BIN" --version || true)
           rm -f anchor_version.txt
 
       - name: Run anchor build and check SBF stack usage

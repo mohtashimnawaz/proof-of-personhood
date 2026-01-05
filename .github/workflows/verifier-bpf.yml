@@ -48,13 +48,25 @@ jobs:
 
       - name: Install Anchor CLI
         run: |
-          npm install -g @coral-xyz/anchor-cli@0.31.2
-          anchor --version
+          set -euo pipefail
+          # Prefer cargo-installed anchor from a known tag; fallback to npm
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! command -v anchor >/dev/null 2>&1; then
+            cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --bin anchor-cli || npm install -g @coral-xyz/anchor-cli@0.31.1
+            chmod +x "$(command -v anchor)" || true
+          fi
+          # Ensure cargo bin is on the PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          ANCHOR_BIN="$(command -v anchor || true)"
+          echo "anchor binary: $ANCHOR_BIN"
+          "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt || true
+          cat anchor_version.txt || true
+          rm -f anchor_version.txt
 
       - name: Build verifier program for BPF
         run: |
           # Ensure anchor CLI is installed and pick binary
-          cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked || npm i -g @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(which anchor)" || true
+          cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --bin anchor-cli || npm i -g @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(which anchor)" || true
           export ANCHOR_BIN="$HOME/.cargo/bin/anchor"
           if [ ! -x "$ANCHOR_BIN" ]; then
             ANCHOR_BIN="$(command -v anchor || true)"
@@ -119,8 +131,20 @@ jobs:
 
       - name: Install Anchor CLI
         run: |
-          npm install -g @coral-xyz/anchor-cli@0.31.2
-          anchor --version
+          set -euo pipefail
+          # Prefer cargo-installed anchor from a known tag; fallback to npm
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! command -v anchor >/dev/null 2>&1; then
+            cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --bin anchor-cli || npm install -g @coral-xyz/anchor-cli@0.31.1
+            chmod +x "$(command -v anchor)" || true
+          fi
+          # Ensure cargo bin is on the PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          ANCHOR_BIN="$(command -v anchor || true)"
+          echo "anchor binary: $ANCHOR_BIN"
+          "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt || true
+          cat anchor_version.txt || true
+          rm -f anchor_version.txt
 
       - name: Build & deploy Anchor program
         run: |
@@ -129,7 +153,7 @@ jobs:
           export ANCHOR_WALLET=deploy_keypair.json
           # Ensure correct Anchor CLI is installed (cargo install from repo tag preferred, fallback to npm)
           # Prefer cargo install from repo tag (specify package) and fallback to npm
-          cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked || npm i -g @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(which anchor)" || true
+          cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked --bin anchor-cli || npm i -g @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(which anchor)" || true
           # Prefer the cargo-installed binary; fallback to system/npm anchor
           export ANCHOR_BIN="$HOME/.cargo/bin/anchor"
           if [ ! -x "$ANCHOR_BIN" ]; then
