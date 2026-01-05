@@ -50,8 +50,8 @@ jobs:
 
       - name: Build verifier program (Anchor)
         run: |
-          # Ensure correct Anchor CLI is installed (cargo install from repo tag preferred, fallback to npm)
-          cargo install --git https://github.com/coral-xyz/anchor --tag v0.31.1 --locked --bin anchor-cli || npm i -g @coral-xyz/anchor-cli@0.31.1
+          # Prefer cargo install from repo tag (specify package) and fallback to npm
+          cargo install --git https://github.com/coral-xyz/anchor anchor-cli --tag v0.31.1 --locked || npm i -g @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(which anchor)" || true
           anchor --version
           # Accept either 0.31.x or 0.32.x
           anchor --version | grep -E "anchor-cli (0\.(31|32)\.)" || (anchor --version && exit 1)
