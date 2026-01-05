@@ -182,29 +182,36 @@ impl<P: BnParameters> PairingEngine for Bn<P> {
             //
             // result = elt^( 2z * ( 6z^2 + 3z + 1 ) * (q^4 - q^2 + 1)/r ).
 
-            let y0 = Self::exp_by_neg_x(r);
-            let y1 = y0.cyclotomic_square();
-            let y2 = y1.cyclotomic_square();
-            let mut y3 = y2 * &y1;
-            let y4 = Self::exp_by_neg_x(y3);
-            let y5 = y4.cyclotomic_square();
-            let mut y6 = Self::exp_by_neg_x(y5);
-            y3.conjugate();
-            y6.conjugate();
-            let y7 = y6 * &y4;
-            let mut y8 = y7 * &y3;
-            let y9 = y8 * &y1;
-            let y10 = y8 * &y4;
-            let y11 = y10 * &r;
-            let mut y12 = y9;
-            y12.frobenius_map(1);
-            let y13 = y12 * &y11;
-            y8.frobenius_map(2);
-            let y14 = y8 * &y13;
-            r.conjugate();
-            let mut y15 = r * &y9;
-            y15.frobenius_map(3);
-            let y16 = y15 * &y14;
+            // Reduce stack pressure by containing many temporaries inside an inner scope
+            // and returning only the small set we need for later steps.
+            let (mut i, j, n) = {
+                let mut a = Self::exp_by_neg_x(r); // y0
+                let b = a.cyclotomic_square(); // y1
+                let c = b.cyclotomic_square(); // y2
+                let mut d = c * &b; // y3
+                let mut e = Self::exp_by_neg_x(d); // y4
+                let _f = e.cyclotomic_square(); // y5
+                let mut g = Self::exp_by_neg_x(_f); // y6
+                d.conjugate();
+                g.conjugate();
+                let h = g * &e; // y7
+                let mut it = h * &d; // y8
+                let j = it * &b; // y9
+                let k = it * &e; // y10
+                let l = k * &r; // y11
+                let mut m = j; // y12
+                m.frobenius_map(1);
+                let n = m * &l; // y13
+                it.frobenius_map(2);
+                // Return the variables we need next
+                (it, j, n)
+            };
+
+            // Continue with smaller live set
+            let o = { i * &n }; // y14
+            let mut t = { let mut tmp = r; tmp.conjugate(); tmp * &j }; // y15
+            t.frobenius_map(3);
+            let y16 = t * &o;
 
             y16
         })
