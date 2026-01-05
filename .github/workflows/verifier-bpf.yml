@@ -39,6 +39,13 @@ jobs:
           echo "unstable-options = true" >> ~/.cargo/config.toml
           echo "next-lockfile-bump = true" >> ~/.cargo/config.toml
 
+      - name: Run Rust unit & integration tests
+        run: |
+          set -euxo pipefail
+          # Run prover and verifier tests to validate end-to-end flow
+          cargo test -p prover --tests -- --nocapture
+          cargo test -p verifier --tests -- --nocapture
+
       - name: Install Anchor CLI
         run: |
           npm install -g @coral-xyz/anchor-cli

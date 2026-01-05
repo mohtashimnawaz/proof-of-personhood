@@ -37,6 +37,12 @@ jobs:
           rustc --version
           cargo --version
 
+      - name: Run verifier tests
+        run: |
+          set -euxo pipefail
+          # Run verifier tests to validate verification logic before building
+          cargo test -p verifier --tests -- --nocapture
+
       - name: Install Anchor CLI
         run: |
           npm install -g @coral-xyz/anchor-cli
