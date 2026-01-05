@@ -23,5 +23,3 @@ anchor-lang = { version = "0.32.1", optional = true }
 
 [dev-dependencies]
 solana-program = "2.3.0"
-
-[workspace]
