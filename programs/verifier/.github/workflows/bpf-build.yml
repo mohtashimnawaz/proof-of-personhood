@@ -37,7 +37,12 @@ jobs:
           rustc --version
           cargo --version
 
-      - name: Build verifier program for BPF
+      - name: Install Anchor CLI
         run: |
-          cd programs/verifier
-          cargo build-bpf --manifest-path ./Cargo.toml --bpf-out-dir ./dist
+          npm install -g @coral-xyz/anchor-cli
+          anchor --version
+
+      - name: Build verifier program (Anchor)
+        run: |
+          # Run anchor build at workspace root and output SBF to the program dist directory
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build -- --sbf-out-dir ./programs/verifier/dist
