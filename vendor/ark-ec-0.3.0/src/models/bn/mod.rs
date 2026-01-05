@@ -186,7 +186,7 @@ impl<P: BnParameters> PairingEngine for Bn<P> {
             // and returning only the small set we need for later steps.
             // More aggressive reduction: allocate some intermediates on the heap
             // to reduce the maximum stack frame size during SBF compilation.
-            use alloc::boxed::Box;
+            use ark_std::boxed::Box;
 
             let (mut it, j, n) = {
                 let a = Box::new(Self::exp_by_neg_x(r)); // boxed y0
