@@ -80,6 +80,43 @@ impl<P: BnParameters> Bn<P> {
         }
         f
     }
+
+    /// Isolated helper to perform the 'hard' part of the final exponentiation.
+    /// This is placed in the inherent impl so it does not attempt to
+    /// implement a non-trait method inside the `impl PairingEngine` block.
+    #[inline(never)]
+    fn final_exponentiation_hard(r: &Fp12<P::Fp12Params>) -> Fp12<P::Fp12Params> {
+        use ark_std::boxed::Box;
+
+        let a = Box::new(Self::exp_by_neg_x(*r)); // boxed y0
+        let b = Box::new(a.cyclotomic_square()); // boxed y1
+        let c = Box::new(b.cyclotomic_square()); // boxed y2
+        let d = Box::new((*c) * &*b); // boxed y3
+        let e = Box::new(Self::exp_by_neg_x(*d)); // boxed y4
+        let _f = Box::new(e.cyclotomic_square()); // boxed y5
+        let g = Box::new(Self::exp_by_neg_x(*_f)); // boxed y6
+
+        // Operate using boxed values to keep temporaries on heap
+        let mut d = *d; // bring into local, reuse after
+        let mut g = *g;
+        d.conjugate();
+        g.conjugate();
+        let h = g * &*e; // y7
+        let mut it = h * &d; // y8
+        let j = it * &*b; // y9
+        let k = it * &*e; // y10
+        let l = k * &*r; // y11
+        let mut m = j; // y12
+        m.frobenius_map(1);
+        let n = m * &l; // y13
+        it.frobenius_map(2);
+
+        // Continue with smaller live set
+        let o = it * &n; // y14
+        let mut t = { let mut tmp = *r; tmp.conjugate(); tmp * &j }; // y15
+        t.frobenius_map(3);
+        t * &o
+    }
 }
 
 impl<P: BnParameters> PairingEngine for Bn<P> {
@@ -182,42 +219,13 @@ impl<P: BnParameters> PairingEngine for Bn<P> {
             //
             // result = elt^( 2z * ( 6z^2 + 3z + 1 ) * (q^4 - q^2 + 1)/r ).
 
-            // Offload the heavy computation into a separate closure so its stack frame
-            // is isolated from the parent function (reduces peak frame size).
-            let y16 = (|| {
-                use ark_std::boxed::Box;
-
-                let a = Box::new(Self::exp_by_neg_x(r)); // boxed y0
-                let b = Box::new(a.cyclotomic_square()); // boxed y1
-                let c = Box::new(b.cyclotomic_square()); // boxed y2
-                let d = Box::new((*c) * &*b); // boxed y3
-                let e = Box::new(Self::exp_by_neg_x(*d)); // boxed y4
-                let _f = Box::new(e.cyclotomic_square()); // boxed y5
-                let g = Box::new(Self::exp_by_neg_x(*_f)); // boxed y6
-
-                // Operate using boxed values to keep temporaries on heap
-                let mut d = *d; // bring into local, reuse after
-                let mut g = *g;
-                d.conjugate();
-                g.conjugate();
-                let h = g * &*e; // y7
-                let mut it = h * &d; // y8
-                let j = it * &*b; // y9
-                let k = it * &*e; // y10
-                let l = k * &r; // y11
-                let mut m = j; // y12
-                m.frobenius_map(1);
-                let n = m * &l; // y13
-                it.frobenius_map(2);
-
-                // Continue with smaller live set
-                let o = it * &n; // y14
-                let mut t = { let mut tmp = r; tmp.conjugate(); tmp * &j }; // y15
-                t.frobenius_map(3);
-                t * &o
-            })();
+            // Offload the heavy computation to a dedicated helper function
+            // so it runs in its own stack frame (annotation prevents inlining).
+            let y16 = Self::final_exponentiation_hard(&r);
 
             y16
         })
     }
+
+
 }
