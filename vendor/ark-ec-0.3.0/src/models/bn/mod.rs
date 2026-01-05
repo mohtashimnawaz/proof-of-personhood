@@ -182,13 +182,11 @@ impl<P: BnParameters> PairingEngine for Bn<P> {
             //
             // result = elt^( 2z * ( 6z^2 + 3z + 1 ) * (q^4 - q^2 + 1)/r ).
 
-            // Reduce stack pressure by containing many temporaries inside an inner scope
-            // and returning only the small set we need for later steps.
-            // More aggressive reduction: allocate some intermediates on the heap
-            // to reduce the maximum stack frame size during SBF compilation.
-            use ark_std::boxed::Box;
+            // Offload the heavy computation into a separate closure so its stack frame
+            // is isolated from the parent function (reduces peak frame size).
+            let y16 = (|| {
+                use ark_std::boxed::Box;
 
-            let (mut it, j, n) = {
                 let a = Box::new(Self::exp_by_neg_x(r)); // boxed y0
                 let b = Box::new(a.cyclotomic_square()); // boxed y1
                 let c = Box::new(b.cyclotomic_square()); // boxed y2
@@ -211,14 +209,13 @@ impl<P: BnParameters> PairingEngine for Bn<P> {
                 m.frobenius_map(1);
                 let n = m * &l; // y13
                 it.frobenius_map(2);
-                (it, j, n)
-            };
 
-            // Continue with smaller live set
-            let o = it * &n; // y14
-            let mut t = { let mut tmp = r; tmp.conjugate(); tmp * &j }; // y15
-            t.frobenius_map(3);
-            let y16 = t * &o;
+                // Continue with smaller live set
+                let o = it * &n; // y14
+                let mut t = { let mut tmp = r; tmp.conjugate(); tmp * &j }; // y15
+                t.frobenius_map(3);
+                t * &o
+            })();
 
             y16
         })
