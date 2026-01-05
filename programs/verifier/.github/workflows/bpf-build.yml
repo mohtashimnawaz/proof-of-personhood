@@ -45,7 +45,7 @@ jobs:
 
       - name: Install Anchor CLI
         run: |
-          npm install -g @coral-xyz/anchor-cli
+          npm install -g @coral-xyz/anchor-cli@0.31.2
           anchor --version
 
       - name: Build verifier program (Anchor)
