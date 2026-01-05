@@ -32,18 +32,21 @@ jobs:
       - name: Install Anchor CLI
         run: |
           set -euo pipefail
-          # Prefer cargo-installed anchor from a known tag; fallback to npm
+          # Prefer cargo-installed anchor from a known tag; fallback to npm (with perms fix)
           export PATH="$HOME/.cargo/bin:$PATH"
           if ! command -v anchor >/dev/null 2>&1; then
-            cargo install --git https://github.com/coral-xyz/anchor --tag v0.31.1 --locked --bin anchor-cli || npm i -g @coral-xyz/anchor-cli@0.31.1
-            chmod +x "$(command -v anchor)" || true
+            cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || \
+            (npm i -g --unsafe-perm @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(command -v anchor)") || true
           fi
           # Ensure cargo bin directory is available in subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           ANCHOR_BIN="$(command -v anchor || true)"
           echo "anchor binary: $ANCHOR_BIN"
-          # Capture anchor version output (stdout+stderr) to avoid failing on non-zero exit codes
-          "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt || true
+          # Attempt to print version; if it fails (EACCES), try chmod and retry
+          if ! "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt ; then
+            chmod +x "$ANCHOR_BIN" || true
+            "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+          fi
           grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || (cat anchor_version.txt && "$ANCHOR_BIN" --version || true)
           rm -f anchor_version.txt
 
