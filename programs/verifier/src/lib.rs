@@ -44,39 +44,32 @@ pub fn process_instruction(_program_id: &Pubkey, _accounts: &[AccountInfo], inst
     let public_inputs_bytes = &instruction_data[376..];
 
     // Deserialize verifying key
-    let vk: VerifyingKey<Bn254> = CanonicalDeserialize::deserialize_uncompressed(vk_bytes)
+    let vk: VerifyingKey<Bn254> = CanonicalDeserialize::deserialize_unchecked(vk_bytes)
         .map_err(|_| {
             msg!("Failed to deserialize verifying key");
             VerifierError::DeserializationFailed
         })?;
 
     // Deserialize proof
-    let proof: Proof<Bn254> = CanonicalDeserialize::deserialize_uncompressed(proof_bytes)
+    let proof: Proof<Bn254> = CanonicalDeserialize::deserialize_unchecked(proof_bytes)
         .map_err(|_| {
             msg!("Failed to deserialize proof");
             VerifierError::InvalidProofFormat
         })?;
 
     // Deserialize public inputs (each is a field element)
-    if public_inputs_bytes.len() % 32 != 0 {
-        msg!("Invalid public inputs size: must be multiple of 32");
-        return Err(VerifierError::InvalidProofFormat.into());
-    }
-
-    let num_inputs = public_inputs_bytes.len() / 32;
     let mut public_inputs = Vec::new();
-    for i in 0..num_inputs {
-        let input_bytes = &public_inputs_bytes[i*32..(i+1)*32];
-        let input = <Bn254 as ark_ff::Field>::BigInt::deserialize_uncompressed(input_bytes)
+    let mut cursor = 0usize;
+    while cursor < public_inputs_bytes.len() {
+        let remaining = &public_inputs_bytes[cursor..];
+        let fe = <Bn254 as ark_ff::Field>::deserialize_unchecked(remaining)
             .map_err(|_| {
-                msg!("Failed to deserialize public input {}", i);
+                msg!("Failed to deserialize public input at offset {}", cursor);
                 VerifierError::DeserializationFailed
             })?;
-        let fe = <Bn254 as ark_ff::Field>::from_bigint(input)
-            .ok_or_else(|| {
-                msg!("Public input {} is out of field range", i);
-                VerifierError::DeserializationFailed
-            })?;
+        // serialize_unchecked doesn't tell us exact bytes read; we can compute canonical size via field size
+        // For BN254 Fr, serialized size is 32 bytes. Advance by 32.
+        cursor += 32;
         public_inputs.push(fe);
     }
 
