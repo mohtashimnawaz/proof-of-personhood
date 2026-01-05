@@ -1,7 +1,8 @@
-pragma circom 2.0.0;
-
-// Multiplier circuit: public inputs are a and a*b, witness includes b
-// Prove that provided a and b multiply to the public output
+// Multiplier circuit:
+// Public inputs: a, ab (ab = a * b)
+// Public inputs: a, ab (ab = a * b)
+// Private witness: b
+// Prove that a * b == ab
 
 template Multiplier() {
     signal input a;
