@@ -3,6 +3,9 @@ use solana_program::pubkey::Pubkey;
 use ark_bn254::{Bn254, Fr};
 use ark_groth16::{generate_random_parameters, create_random_proof};
 use ark_serialize::CanonicalSerialize;
+use ark_r1cs_std::alloc::AllocVar;
+use ark_r1cs_std::eq::EqGadget;
+use rand::Rng;
 
 #[derive(Clone)]
 struct SimpleCircuit {
