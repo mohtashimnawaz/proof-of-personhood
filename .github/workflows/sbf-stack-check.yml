@@ -33,9 +33,10 @@ jobs:
         run: |
           # Try cargo install from repo tag first; fallback to npm if not available
           if ! command -v anchor >/dev/null 2>&1; then
-            cargo install --git https://github.com/coral-xyz/anchor --tag v0.31.2 --locked --bin anchor-cli || npm i -g @coral-xyz/anchor-cli@0.31.2
+            cargo install --git https://github.com/coral-xyz/anchor --tag v0.31.1 --locked --bin anchor-cli || npm i -g @coral-xyz/anchor-cli@0.31.1
           fi
-          anchor --version || true
+          anchor --version
+          anchor --version | grep -E "anchor-cli (0\.(31|32)\.)" || anchor --version || true
 
       - name: Run anchor build and check SBF stack usage
         env:
