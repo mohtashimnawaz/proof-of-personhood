@@ -1,6 +1,8 @@
 {
   "license": "ISC",
   "scripts": {
+    "test": "anchor test",
+    "test:mocha": "mocha -r ts-node/register tests/**/*.ts --timeout 200000",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "submit-proof": "ts-node --transpile-only scripts/client/submit_proof.ts"

@@ -3,6 +3,9 @@ name = "prover"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+idl-build = ["anchor-lang/idl-build"]
+
 [dependencies]
 ark-groth16 = { version = "0.3" }
 ark-bn254 = { version = "0.3" }
@@ -16,6 +19,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rand = "0.8"
 verifier = { path = "../verifier" }
+anchor-lang = { version = "0.32.1", optional = true }
 
 [dev-dependencies]
 solana-program = "2.3.0"
+
+[workspace]

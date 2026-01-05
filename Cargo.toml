@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "programs/*",
-    "programs/prover"
+    "programs/proof-of-personhood",
+    "programs/verifier"
 ]
 resolver = "2"
 
