@@ -184,31 +184,38 @@ impl<P: BnParameters> PairingEngine for Bn<P> {
 
             // Reduce stack pressure by containing many temporaries inside an inner scope
             // and returning only the small set we need for later steps.
-            let (mut i, j, n) = {
-                let mut a = Self::exp_by_neg_x(r); // y0
-                let b = a.cyclotomic_square(); // y1
-                let c = b.cyclotomic_square(); // y2
-                let mut d = c * &b; // y3
-                let mut e = Self::exp_by_neg_x(d); // y4
-                let _f = e.cyclotomic_square(); // y5
-                let mut g = Self::exp_by_neg_x(_f); // y6
+            // More aggressive reduction: allocate some intermediates on the heap
+            // to reduce the maximum stack frame size during SBF compilation.
+            use alloc::boxed::Box;
+
+            let (mut it, j, n) = {
+                let a = Box::new(Self::exp_by_neg_x(r)); // boxed y0
+                let b = Box::new(a.cyclotomic_square()); // boxed y1
+                let c = Box::new(b.cyclotomic_square()); // boxed y2
+                let d = Box::new((*c) * &*b); // boxed y3
+                let e = Box::new(Self::exp_by_neg_x(*d)); // boxed y4
+                let _f = Box::new(e.cyclotomic_square()); // boxed y5
+                let g = Box::new(Self::exp_by_neg_x(*_f)); // boxed y6
+
+                // Operate using boxed values to keep temporaries on heap
+                let mut d = *d; // bring into local, reuse after
+                let mut g = *g;
                 d.conjugate();
                 g.conjugate();
-                let h = g * &e; // y7
+                let h = g * &*e; // y7
                 let mut it = h * &d; // y8
-                let j = it * &b; // y9
-                let k = it * &e; // y10
+                let j = it * &*b; // y9
+                let k = it * &*e; // y10
                 let l = k * &r; // y11
                 let mut m = j; // y12
                 m.frobenius_map(1);
                 let n = m * &l; // y13
                 it.frobenius_map(2);
-                // Return the variables we need next
                 (it, j, n)
             };
 
             // Continue with smaller live set
-            let o = { i * &n }; // y14
+            let o = it * &n; // y14
             let mut t = { let mut tmp = r; tmp.conjugate(); tmp * &j }; // y15
             t.frobenius_map(3);
             let y16 = t * &o;
