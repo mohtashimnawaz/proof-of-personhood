@@ -60,3 +60,88 @@ jobs:
           CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build
           # Restore the toolchain file
           mv rust-toolchain.toml.bak rust-toolchain.toml
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: build-verifier-bpf
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Solana CLI
+        run: |
+          SOLANA_VERSION="v1.18.26"
+          cd /tmp
+          wget -q "https://github.com/solana-labs/solana/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" -O solana-release.tar.bz2
+          tar jxf solana-release.tar.bz2
+          echo "/tmp/solana-release/bin" >> $GITHUB_PATH
+          export PATH="/tmp/solana-release/bin:$PATH"
+          solana --version
+
+      - name: Setup Rust Toolchain (nightly)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: rust-src
+
+      - name: Start local validator and fund wallet
+        run: |
+          set -euxo pipefail
+          # Create a keypair for deploy / payer
+          solana-keygen new --no-passphrase -o deploy_keypair.json
+          solana config set --url http://127.0.0.1:8899 --keypair deploy_keypair.json
+          # Start validator in background
+          nohup solana-test-validator --reset > validator.log 2>&1 &
+          VALIDATOR_PID=$!
+          echo "Started solana-test-validator (pid $VALIDATOR_PID)"
+          # Wait for health
+          for i in {1..30}; do
+            if solana --url http://127.0.0.1:8899 health >/dev/null 2>&1; then
+              echo 'Validator is up'; break
+            fi
+            sleep 1
+          done
+          # Airdrop funds to deploy key
+          solana airdrop 10 $(solana-keygen pubkey deploy_keypair.json)
+
+      - name: Install Anchor CLI
+        run: |
+          npm install -g @coral-xyz/anchor-cli
+          anchor --version
+
+      - name: Build & deploy Anchor program
+        run: |
+          set -euxo pipefail
+          export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899
+          export ANCHOR_WALLET=deploy_keypair.json
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build
+          # Try deploy; if it fails (already deployed), continue
+          anchor deploy --provider.cluster localnet || true
+          PROGRAM_KEYPAIR=target/deploy/proof_of_personhood-keypair.json
+          if [ -f "$PROGRAM_KEYPAIR" ]; then
+            VERIFIER_PROGRAM_ID=$(solana-keygen pubkey $PROGRAM_KEYPAIR)
+            echo "VERIFIER_PROGRAM_ID=$VERIFIER_PROGRAM_ID"
+            echo "VERIFIER_PROGRAM_ID=$VERIFIER_PROGRAM_ID" >> $GITHUB_ENV
+          else
+            echo "Program keypair not found: $PROGRAM_KEYPAIR"; cat target/deploy || true; exit 1
+          fi
+
+      - name: Run TS submit script
+        run: |
+          set -euxo pipefail
+          yarn install --silent
+          export VERIFIER_PROGRAM_ID=${{ env.VERIFIER_PROGRAM_ID }}
+          export RPC_URL=http://127.0.0.1:8899
+          export SOLANA_KEYPAIR=deploy_keypair.json
+          yarn submit-proof
+
+      - name: Stop validator
+        if: always()
+        run: |
+          pkill -f solana-test-validator || true
+          sleep 1
