@@ -173,10 +173,24 @@ jobs:
             ANCHOR_BIN="$(command -v anchor || true)"
           fi
           echo "Using anchor binary: $ANCHOR_BIN"
-          # Attempt to print version; if it fails (EACCES), try chmod and retry
+          # Attempt to print version; if it fails (EACCES) try chmod underlying path and retry,
+          # otherwise attempt to force-install cargo-built anchor (try without --locked first).
           if ! "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt ; then
-            chmod +x "$ANCHOR_BIN" || true
-            "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+            BINPATH=$(sed -nE 's/.*spawnSync ([^ ]+) EACCES.*/\1/p' anchor_version.txt | head -n1 || true)
+            if [ -n "$BINPATH" ]; then
+              chmod +x "$BINPATH" || true
+              "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+            else
+              chmod +x "$ANCHOR_BIN" || true
+              "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+            fi
+            if ! grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt >/dev/null 2>&1; then
+              cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --bin anchor || \
+              cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || true
+              echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+              ANCHOR_BIN="$(command -v anchor || true)"
+              "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+            fi
           fi
           # Confirm we have a compatible version (0.31.x or 0.32.x)
           grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || (cat anchor_version.txt && exit 1)
