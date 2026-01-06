@@ -49,28 +49,13 @@ jobs:
           # Prefer cargo-installed anchor from a known tag; fallback to npm (with perms fix)
           export PATH="$HOME/.cargo/bin:$PATH"
           if ! command -v anchor >/dev/null 2>&1; then
-            if ! cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor; then
-              TMP_ANCHOR_DIR="$(mktemp -d)"
-              npm i --prefix "$TMP_ANCHOR_DIR" @coral-xyz/anchor-cli@0.31.1 || true
-              if [ -x "$TMP_ANCHOR_DIR/bin/anchor" ]; then
-                ANCHOR_CAND="$TMP_ANCHOR_DIR/bin/anchor"
-              elif [ -x "$TMP_ANCHOR_DIR/node_modules/.bin/anchor" ]; then
-                ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/.bin/anchor"
-              elif [ -x "$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor" ]; then
-                ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor"
-              else
-                ANCHOR_CAND=""
+            # Try crates.io published `anchor-cli` first, then git with explicit package, then npm local fallback
+            if ! cargo install anchor-cli --version 0.31.1 --locked --bin anchor 2>/dev/null; then
+              if ! cargo install --git https://github.com/coral-xyz/anchor --package anchor-cli --tag v0.31.1 --locked --bin anchor; then
+                cargo install --git https://github.com/coral-xyz/anchor --package anchor-cli --bin anchor || true
               fi
-              if [ -n "$ANCHOR_CAND" ]; then
-                chmod +x "$ANCHOR_CAND" || true
-                TMP_ANCHOR_BIN_DIR="$(dirname "$ANCHOR_CAND")"
-                export PATH="$TMP_ANCHOR_BIN_DIR:$PATH"
-                echo "Using local npm anchor at $TMP_ANCHOR_BIN_DIR"
-              else
-                echo "Local npm install didn't produce anchor binary; listing $TMP_ANCHOR_DIR"
-                ls -la "$TMP_ANCHOR_DIR" || true
-              fi
-            fi
+            fi || \
+            (TMP_ANCHOR_DIR="$(mktemp -d)" && npm i --prefix "$TMP_ANCHOR_DIR" @coral-xyz/anchor-cli@0.31.1 && { if [ -x "$TMP_ANCHOR_DIR/bin/anchor" ]; then ANCHOR_CAND="$TMP_ANCHOR_DIR/bin/anchor"; elif [ -x "$TMP_ANCHOR_DIR/node_modules/.bin/anchor" ]; then ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/.bin/anchor"; elif [ -x "$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor" ]; then ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor"; else ANCHOR_CAND=""; fi; } && if [ -n "$ANCHOR_CAND" ]; then chmod +x "$ANCHOR_CAND" || true; TMP_ANCHOR_BIN_DIR="$(dirname "$ANCHOR_CAND")"; export PATH="$TMP_ANCHOR_BIN_DIR:$PATH"; echo "Using local npm anchor at $TMP_ANCHOR_BIN_DIR"; else echo "Local npm install didn't produce anchor binary; listing $TMP_ANCHOR_DIR"; ls -la "$TMP_ANCHOR_DIR" || true; fi) || true
           fi
           # Ensure cargo bin directory is available in subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
