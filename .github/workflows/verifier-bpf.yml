@@ -209,22 +209,21 @@ jobs:
             cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || \
             (npm i -g --unsafe-perm @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(command -v anchor)") || true
           fi
-          # Prefer cargo-installed anchor; ensure cargo binary exists by attempting an install first
-          export ANCHOR_BIN="$HOME/.cargo/bin/anchor"
-          if [ ! -x "$ANCHOR_BIN" ]; then
-            echo "cargo-built anchor not present or not executable; attempting cargo install"
-            # Try with tag/locked, then without locked, then without tag
+          # Prefer cargo-installed anchor; if the runner's toolcache anchor is present (often EACCES), prefer installing ours
+          ANCHOR_DETECTED="$(command -v anchor || true)"
+          if [ -n "$ANCHOR_DETECTED" ] && echo "$ANCHOR_DETECTED" | grep -qE "/opt/hostedtoolcache|node_modules"; then
+            echo "Runner-provided anchor detected at $ANCHOR_DETECTED; installing cargo-built anchor to override"
+            # Try to install a cargo-built anchor (try locked/tag) to $HOME/.cargo/bin
             cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || \
             cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --bin anchor || \
             cargo install --git https://github.com/coral-xyz/anchor anchor --bin anchor || true
-            # Ensure cargo bin dir is in the path for subsequent steps
             echo "$HOME/.cargo/bin" >> $GITHUB_PATH
             export PATH="$HOME/.cargo/bin:$PATH"
-            ANCHOR_BIN="$HOME/.cargo/bin/anchor"
-            if [ ! -x "$ANCHOR_BIN" ]; then
-              # Fall back to any anchor in PATH if cargo install didn't produce it
-              ANCHOR_BIN="$(command -v anchor || true)"
-            fi
+          fi
+          # Resolve ANCHOR_BIN preferring the cargo-installed binary if available
+          export ANCHOR_BIN="$HOME/.cargo/bin/anchor"
+          if [ ! -x "$ANCHOR_BIN" ]; then
+            ANCHOR_BIN="$(command -v anchor || true)"
           fi
           echo "Using anchor binary: $ANCHOR_BIN"
 
