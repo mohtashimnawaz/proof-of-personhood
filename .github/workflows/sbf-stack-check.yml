@@ -29,52 +29,96 @@ jobs:
           curl -sSfL https://release.solana.com/stable/install | sh
           echo "${HOME}/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
-      - name: Install Anchor CLI
+      - name: Install Anchor CLI (verbose / resilient)
         run: |
           set -euo pipefail
-          # Prefer cargo-installed anchor from a known tag; fallback to npm (with perms fix)
+          echo "=== Environment diagnostics ==="
+          rustc --version || true
+          cargo --version || true
+          node --version || true
+          npm --version || true
+          echo "PATH=$PATH"
+          echo "Existing anchor: $(command -v anchor || true)"
+
           export PATH="$HOME/.cargo/bin:$PATH"
-          if ! command -v anchor >/dev/null 2>&1; then
-            # Try crates.io package first, then git with explicit package
-            if ! cargo install anchor-cli --version 0.31.1 --locked --bin anchor 2>/dev/null; then
-              if ! cargo install --git https://github.com/coral-xyz/anchor --package anchor-cli --tag v0.31.1 --locked --bin anchor; then
-                cargo install --git https://github.com/coral-xyz/anchor --package anchor-cli --bin anchor || true
+
+          echo "=== Attempting install: crates.io -> git -> npm local fallback ==="
+          # Try crates.io published package first
+          if cargo install anchor-cli --version 0.31.1 --locked --bin anchor 2>&1 | tee anchor_install.log ; then
+            echo "Installed anchor-cli from crates.io"
+          else
+            echo "crates.io install failed (see anchor_install.log), trying git --package anchor-cli"
+            tail -n +1 anchor_install.log || true
+            if cargo install --git https://github.com/coral-xyz/anchor --package anchor-cli --tag v0.31.1 --locked --bin anchor 2>&1 | tee -a anchor_install.log ; then
+              echo "Installed anchor-cli from git tag v0.31.1"
+            else
+              echo "git tag install failed; trying git without --locked"
+              if cargo install --git https://github.com/coral-xyz/anchor --package anchor-cli --bin anchor 2>&1 | tee -a anchor_install.log ; then
+                echo "Installed anchor-cli from git (no tag)"
+              else
+                echo "cargo installs failed; attempting local npm fallback (see npm_install.log)"
+                TMP_ANCHOR_DIR="$(mktemp -d)"
+                npm i --prefix "$TMP_ANCHOR_DIR" @coral-xyz/anchor-cli@0.31.1 2>&1 | tee "$TMP_ANCHOR_DIR/npm_install.log" || true
+                ls -la "$TMP_ANCHOR_DIR" || true
+                # Find candidate anchor binary in common locations
+                if [ -x "$TMP_ANCHOR_DIR/bin/anchor" ]; then
+                  ANCHOR_CAND="$TMP_ANCHOR_DIR/bin/anchor"
+                elif [ -x "$TMP_ANCHOR_DIR/node_modules/.bin/anchor" ]; then
+                  ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/.bin/anchor"
+                elif [ -x "$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor" ]; then
+                  ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor"
+                else
+                  ANCHOR_CAND=""
+                fi
+                if [ -n "$ANCHOR_CAND" ]; then
+                  chmod +x "$ANCHOR_CAND" || true
+                  TMP_ANCHOR_BIN_DIR="$(dirname "$ANCHOR_CAND")"
+                  export PATH="$TMP_ANCHOR_BIN_DIR:$PATH"
+                  echo "Using local npm anchor at $TMP_ANCHOR_BIN_DIR"
+                else
+                  echo "Local npm fallback didn't produce an anchor binary. See $TMP_ANCHOR_DIR/npm_install.log and anchor_install.log"
+                  tail -n +1 "$TMP_ANCHOR_DIR/npm_install.log" || true
+                  tail -n +1 anchor_install.log || true
+                fi
               fi
-            fi || 
-            # If the cargo paths didn't work, fallback to a local npm install
-            (TMP_ANCHOR_DIR="$(mktemp -d)" && npm i --prefix "$TMP_ANCHOR_DIR" @coral-xyz/anchor-cli@0.31.1 && { if [ -x "$TMP_ANCHOR_DIR/bin/anchor" ]; then ANCHOR_CAND="$TMP_ANCHOR_DIR/bin/anchor"; elif [ -x "$TMP_ANCHOR_DIR/node_modules/.bin/anchor" ]; then ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/.bin/anchor"; elif [ -x "$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor" ]; then ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor"; else ANCHOR_CAND=""; fi; } && if [ -n "$ANCHOR_CAND" ]; then chmod +x "$ANCHOR_CAND" || true; TMP_ANCHOR_BIN_DIR="$(dirname "$ANCHOR_CAND")"; export PATH="$TMP_ANCHOR_BIN_DIR:$PATH"; echo "Using local npm anchor at $TMP_ANCHOR_BIN_DIR"; else echo "Local npm install didn't produce anchor binary; listing $TMP_ANCHOR_DIR"; ls -la "$TMP_ANCHOR_DIR" || true; fi) || true
+            fi
+          fi
+
           # Ensure cargo bin directory is available in subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           ANCHOR_BIN="$(command -v anchor || true)"
-          echo "anchor binary: $ANCHOR_BIN"
-          # Attempt to print version; if it fails (EACCES) try chmod underlying path and retry,
-          # otherwise attempt to force-install cargo-built anchor (try without --locked first).
-          if ! "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt ; then
+          echo "anchor binary after install: $ANCHOR_BIN"
+
+          echo "=== anchor --version diagnostics ==="
+          if ! ("$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt); then
+            echo "anchor --version failed; inspecting output..."
+            sed -n '1,200p' anchor_version.txt || true
             BINPATH=$(sed -nE 's/.*spawnSync ([^ ]+) EACCES.*/\1/p' anchor_version.txt | head -n1 || true)
             if [ -n "$BINPATH" ]; then
+              echo "Found underlying path: $BINPATH; chmod +x and retry"
               chmod +x "$BINPATH" || true
-              "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
-            else
-              chmod +x "$ANCHOR_BIN" || true
-              "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
-            fi
-            if ! grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt >/dev/null 2>&1; then
-              cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --bin anchor || \
-              cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || true
-              echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-              ANCHOR_BIN="$(command -v anchor || true)"
               "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
             fi
           fi
-          grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || anchor --version || true
-          rm -f anchor_version.txt
+          echo "Final anchor --version output:"
+          cat anchor_version.txt || true
+          rm -f anchor_version.txt || true
+          echo "=== Install step complete ==="
 
       - name: Run anchor build and check SBF stack usage
         env:
           RUSTFLAGS: "-C target-cpu=native"
         run: |
           set -o pipefail
-          anchor build 2>&1 | tee build.log || true
+          # Use resolved anchor binary (prefer cargo-installed or local npm fallback)
+          ANCHOR_BIN="$(command -v anchor || true)"
+          echo "Using anchor binary for build: $ANCHOR_BIN"
+          if [ -n "$ANCHOR_BIN" ]; then
+            "$ANCHOR_BIN" build 2>&1 | tee build.log || true
+          else
+            echo "No anchor binary found; aborting build step" >&2
+            exit 1
+          fi
           if grep -E "Stack offset of [0-9]+ exceeded max offset of 4096" build.log; then
             echo "SBF stack regression detected:" >&2
             grep -nE "Stack offset of [0-9]+ exceeded max offset of 4096" build.log >&2
