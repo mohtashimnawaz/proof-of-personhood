@@ -124,7 +124,8 @@ jobs:
           ANCHOR_BIN="$(command -v anchor || true)"
           echo "Using anchor binary for build: $ANCHOR_BIN"
           if [ -n "$ANCHOR_BIN" ]; then
-            "$ANCHOR_BIN" build 2>&1 | tee build.log || true
+            # Ensure anchor build uses the pinned toolchain
+            RUSTUP_TOOLCHAIN=1.92.0 CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build 2>&1 | tee build.log || true
           else
             echo "No anchor binary found; aborting build step" >&2
             exit 1
