@@ -54,7 +54,8 @@ jobs:
           if ! command -v anchor >/dev/null 2>&1; then
             # Install via cargo using the actual bin name 'anchor'
             cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || \
-            (npm i -g --unsafe-perm @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(command -v anchor)") || true
+            # Fallback: install anchor CLI locally to a temp dir (avoids global EACCES issues)
+            (TMP_ANCHOR_DIR="$(mktemp -d)" && npm i --prefix "$TMP_ANCHOR_DIR" @coral-xyz/anchor-cli@0.31.1 && chmod +x "$TMP_ANCHOR_DIR/bin/anchor" && export PATH="$TMP_ANCHOR_DIR/bin:$PATH" && echo "Using local npm anchor at $TMP_ANCHOR_DIR/bin") || true
           fi
           # Ensure cargo bin is on the PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
@@ -71,7 +72,7 @@ jobs:
       - name: Build verifier program for BPF
         run: |
           # Ensure anchor CLI is installed and pick binary
-          cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || (npm i -g --unsafe-perm @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(which anchor)") || true
+          cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || (TMP_ANCHOR_DIR="$(mktemp -d)" && npm i --prefix "$TMP_ANCHOR_DIR" @coral-xyz/anchor-cli@0.31.1 && chmod +x "$TMP_ANCHOR_DIR/bin/anchor" && export PATH="$TMP_ANCHOR_DIR/bin:$PATH" && echo "Using local npm anchor at $TMP_ANCHOR_DIR/bin") || true
           export ANCHOR_BIN="$HOME/.cargo/bin/anchor"
           if [ ! -x "$ANCHOR_BIN" ]; then
             ANCHOR_BIN="$(command -v anchor || true)"
