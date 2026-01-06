@@ -209,14 +209,27 @@ jobs:
             cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || \
             (npm i -g --unsafe-perm @coral-xyz/anchor-cli@0.31.1 && chmod +x "$(command -v anchor)") || true
           fi
-          # Prefer the cargo-installed binary; fallback to system/npm anchor
+          # Prefer cargo-installed anchor; ensure cargo binary exists by attempting an install first
           export ANCHOR_BIN="$HOME/.cargo/bin/anchor"
           if [ ! -x "$ANCHOR_BIN" ]; then
-            ANCHOR_BIN="$(command -v anchor || true)"
+            echo "cargo-built anchor not present or not executable; attempting cargo install"
+            # Try with tag/locked, then without locked, then without tag
+            cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || \
+            cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --bin anchor || \
+            cargo install --git https://github.com/coral-xyz/anchor anchor --bin anchor || true
+            # Ensure cargo bin dir is in the path for subsequent steps
+            echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+            export PATH="$HOME/.cargo/bin:$PATH"
+            ANCHOR_BIN="$HOME/.cargo/bin/anchor"
+            if [ ! -x "$ANCHOR_BIN" ]; then
+              # Fall back to any anchor in PATH if cargo install didn't produce it
+              ANCHOR_BIN="$(command -v anchor || true)"
+            fi
           fi
           echo "Using anchor binary: $ANCHOR_BIN"
+
           # Attempt to print version; if it fails (EACCES) try chmod underlying path and retry,
-          # otherwise attempt to force-install cargo-built anchor (try without --locked first).
+          # otherwise attempt to force-install cargo-built anchor (try again as a last resort).
           if ! "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt ; then
             BINPATH=$(sed -nE 's/.*spawnSync ([^ ]+) EACCES.*/\1/p' anchor_version.txt | head -n1 || true)
             if [ -n "$BINPATH" ]; then
@@ -227,13 +240,15 @@ jobs:
               "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
             fi
             if ! grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt >/dev/null 2>&1; then
+              echo "Second attempt: cargo installing anchor as fallback"
               cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --bin anchor || \
-              cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || true
+              cargo install --git https://github.com/coral-xyz/anchor anchor --bin anchor || true
               echo "$HOME/.cargo/bin" >> $GITHUB_PATH
               ANCHOR_BIN="$(command -v anchor || true)"
               "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
             fi
           fi
+
           # Confirm we have a compatible version (0.31.x or 0.32.x)
           grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || (cat anchor_version.txt && exit 1)
           rm -f anchor_version.txt
