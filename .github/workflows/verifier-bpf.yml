@@ -239,13 +239,44 @@ jobs:
               chmod +x "$ANCHOR_BIN" || true
               "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
             fi
+
+            # If anchor path is in the hosted toolcache or still failing with EACCES, prefer a local npm install
             if ! grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt >/dev/null 2>&1; then
-              echo "Second attempt: cargo installing anchor as fallback"
-              cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --bin anchor || \
-              cargo install --git https://github.com/coral-xyz/anchor anchor --bin anchor || true
-              echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-              ANCHOR_BIN="$(command -v anchor || true)"
-              "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+              if echo "$ANCHOR_BIN" | grep -qE "/opt/hostedtoolcache|node_modules" || grep -q "EACCES" anchor_version.txt; then
+                echo "Detected EACCES or hosted toolcache anchor; attempting local npm install fallback"
+                TMP_ANCHOR_DIR="$(mktemp -d)"
+                npm i --prefix "$TMP_ANCHOR_DIR" @coral-xyz/anchor-cli@0.31.1 || true
+                if [ -x "$TMP_ANCHOR_DIR/bin/anchor" ]; then
+                  ANCHOR_CAND="$TMP_ANCHOR_DIR/bin/anchor"
+                elif [ -x "$TMP_ANCHOR_DIR/node_modules/.bin/anchor" ]; then
+                  ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/.bin/anchor"
+                elif [ -x "$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor" ]; then
+                  ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor"
+                else
+                  ANCHOR_CAND=""
+                fi
+                if [ -n "$ANCHOR_CAND" ]; then
+                  chmod +x "$ANCHOR_CAND" || true
+                  TMP_ANCHOR_BIN_DIR="$(dirname "$ANCHOR_CAND")"
+                  export PATH="$TMP_ANCHOR_BIN_DIR:$PATH"
+                  ANCHOR_BIN="$ANCHOR_CAND"
+                  echo "Using local npm anchor at $TMP_ANCHOR_BIN_DIR"
+                  "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+                else
+                  echo "Local npm install fallback did not produce anchor binary; will try cargo install fallback"
+                  ls -la "$TMP_ANCHOR_DIR" || true
+                fi
+              fi
+
+              # If still not the right version, attempt cargo install fallback
+              if ! grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt >/dev/null 2>&1; then
+                echo "Second attempt: cargo installing anchor as fallback"
+                cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --bin anchor || \
+                cargo install --git https://github.com/coral-xyz/anchor anchor --bin anchor || true
+                echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+                ANCHOR_BIN="$(command -v anchor || true)"
+                "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+              fi
             fi
           fi
 
