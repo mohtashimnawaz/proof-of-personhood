@@ -1,4 +1,4 @@
-import { utils, getPublicKey, sign as edSign, verify as edVerify } from 'noble-ed25519';
+import { utils, getPublicKey as nobleGetPublicKey, sign as edSign, verify as edVerify } from 'noble-ed25519';
 import * as bbs from '@mattrglobal/bbs-signatures';
 
 // Simple in-memory key stores for prototype. Swap to HSM/KMS in prod.
@@ -9,8 +9,8 @@ let blsKeyPair: any = null; // internal BLS keypair from mattr
 export async function generateKeyPair() {
   // noble-ed25519 utils.randomPrivateKey returns Uint8Array
   privateKey = utils.randomPrivateKey();
-  const pub = await getPublicKey(privateKey);
-  publicKeyHex = Buffer.from(pub).toString('hex');
+  const pub = await nobleGetPublicKey(privateKey);
+  publicKeyHex = typeof pub === 'string' ? pub : Buffer.from(pub).toString('hex');
   return { privateKey: Buffer.from(privateKey).toString('hex'), publicKey: publicKeyHex };
 }
 
@@ -22,7 +22,7 @@ function stableStringify(obj: any): string {
   return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}';
 }
 
-export async function getPublicKey() {
+export async function getPublicKeyInfo() {
   if (!publicKeyHex) throw new Error('keypair not generated');
   return { alg: 'ed25519', kty: 'OKP', publicKeyHex };
 }
@@ -44,11 +44,7 @@ export async function verifyCredentialSignature(credential: Record<string, any>,
 
 // ------------------ BBS+ support (prototype) ------------------
 
-function toUtf8Bytes(s: string) {
-  return new TextEncoder().encode(s);
-}
-
-function credentialToMessages(credential: Record<string, any>): Uint8Array[] {
+function credentialToMessages(credential: Record<string, any>): string[] {
   // Deterministic ordering: issuer, subject, then claims sorted by key, then issuedAt
   const msgs: string[] = [];
   msgs.push(String(credential.issuer || ''));
@@ -59,11 +55,11 @@ function credentialToMessages(credential: Record<string, any>): Uint8Array[] {
     msgs.push(String(claims[k]));
   }
   msgs.push(String(credential.issuedAt || ''));
-  return msgs.map(m => toUtf8Bytes(m));
+  return msgs;
 }
 
 export async function generateBbsKeyPair() {
-  blsKeyPair = await bbs.generateBls12381G2KeyPair();
+  blsKeyPair = await bbs.generateBls12381KeyPair();
   const pub = Buffer.from(blsKeyPair.publicKey).toString('hex');
   return { blsPublicKeyHex: pub };
 }

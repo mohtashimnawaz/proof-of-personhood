@@ -1,7 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
-import { generateKeyPair, getPublicKey, signCredential, blindSignUnavailable, generateBbsKeyPair, signBbsCredential, verifyBbsCredential } from './issuer';
+import { generateKeyPair, getPublicKeyInfo, signCredential, blindSignUnavailable, generateBbsKeyPair, signBbsCredential, verifyBbsCredential } from './issuer';
 
 const app = express();
 app.use(cors());
@@ -11,7 +11,7 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.get('/keys', async (_req, res) => {
   try {
-    const k = await getPublicKey();
+    const k = await getPublicKeyInfo();
     res.json(k);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -69,7 +69,7 @@ app.post('/bbs/verify', async (req, res) => {
     const { credential, signature } = req.body;
     if (!credential || !signature) return res.status(400).json({ error: 'credential and signature are required' });
     const ok = await verifyBbsCredential(credential, signature);
-    res.json({ verified: ok });
+    res.json(ok);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -85,12 +85,12 @@ app.post('/issue/blind-sign', (_req, res) => {
 
 const PORT = process.env.PORT || 4001;
 
-async function start() {
+(async function init() {
   await generateKeyPair();
   await generateBbsKeyPair();
-  app.listen(PORT, () => console.log(`Issuer prototype running on port ${PORT}`));
-}
-
-start();
+  if (process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, () => console.log(`Issuer prototype running on port ${PORT}`));
+  }
+})();
 
 export default app;
