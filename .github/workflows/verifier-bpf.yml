@@ -54,11 +54,9 @@ jobs:
           # Explicitly use rustup to run cargo with the correct toolchain
           rustup run 1.92.0 rustc --version
           echo "Using rustc: $(rustup run 1.92.0 rustc --version)"
-          # Install Anchor CLI via avm using the correct toolchain
-          rustup run 1.92.0 cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          rustup run 1.92.0 avm install 0.31.1
-          avm use 0.31.1
-          echo "$HOME/.avm/bin" >> $GITHUB_PATH
+          # Install Anchor CLI directly from crates.io using the correct toolchain
+          rustup run 1.92.0 cargo install --version 0.31.1 anchor-cli --locked --force
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           anchor --version
 
       - name: Build verifier program for BPF
@@ -126,11 +124,9 @@ jobs:
           # Explicitly use rustup to run cargo with the correct toolchain
           rustup run 1.92.0 rustc --version
           echo "Using rustc: $(rustup run 1.92.0 rustc --version)"
-          # Install Anchor CLI via avm using the correct toolchain
-          rustup run 1.92.0 cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          rustup run 1.92.0 avm install 0.31.1
-          avm use 0.31.1
-          echo "$HOME/.avm/bin" >> $GITHUB_PATH
+          # Install Anchor CLI directly from crates.io using the correct toolchain
+          rustup run 1.92.0 cargo install --version 0.31.1 anchor-cli --locked --force
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           anchor --version
 
       - name: Build & deploy Anchor program
