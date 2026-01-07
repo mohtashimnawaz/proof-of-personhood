@@ -58,39 +58,21 @@ jobs:
       - name: Install Anchor CLI
         run: |
           set -euo pipefail
-          # Install Anchor CLI via npm (more reliable than cargo install from git)
           export PATH="$HOME/.cargo/bin:$PATH"
-          npm install -g @coral-xyz/anchor-cli@0.31.1
-          # Fix permissions on the actual anchor binary (not just the wrapper)
-          ANCHOR_WRAPPER="$(command -v anchor)"
-          echo "anchor wrapper: $ANCHOR_WRAPPER"
-          chmod +x "$ANCHOR_WRAPPER" || true
-          # The actual binary is in the lib directory
-          ANCHOR_LIB_BIN="$(dirname "$ANCHOR_WRAPPER")/../lib/node_modules/@coral-xyz/anchor-cli/anchor"
-          if [ -f "$ANCHOR_LIB_BIN" ]; then
-            chmod +x "$ANCHOR_LIB_BIN"
-            echo "Fixed permissions on: $ANCHOR_LIB_BIN"
-          fi
-          # Ensure cargo bin is on the PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          "$ANCHOR_WRAPPER" --version
+          # Install Anchor CLI via avm (builds actual binary, avoids version mismatch)
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install 0.31.1
+          avm use 0.31.1
+          echo "$HOME/.avm/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.avm/bin:$PATH"
+          anchor --version
 
       - name: Build verifier program for BPF
         env:
           RUSTUP_TOOLCHAIN: "1.92.0"
-          PATH: "${HOME}/.cargo/bin:$PATH"
         run: |
           # Force correct Rust toolchain
-          export PATH="${HOME}/.cargo/bin:$PATH"
-          export RUSTUP_TOOLCHAIN="1.92.0"
-          rustup default 1.92.0
-          # Ensure anchor CLI is available
-          export PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH"
-          ANCHOR_BIN="$(command -v anchor)"
-          echo "Using anchor binary: $ANCHOR_BIN"
-
-          # Explicitly prepend cargo bin to PATH to override Solana's bundled rust
-          export PATH="${HOME}/.cargo/bin:$PATH"
+          export PATH="$HOME/.avm/bin:$HOME/.cargo/bin:$PATH"
           export RUSTUP_TOOLCHAIN="1.92.0"
           rustup default 1.92.0
           
@@ -103,7 +85,7 @@ jobs:
           cargo --version
           
           # Run anchor build
-          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build
 
   e2e:
     runs-on: ubuntu-latest
@@ -156,37 +138,28 @@ jobs:
       - name: Install Anchor CLI
         run: |
           set -euo pipefail
-          # Install Anchor CLI via npm
           export PATH="$HOME/.cargo/bin:$PATH"
-          npm install -g @coral-xyz/anchor-cli@0.31.1
-          # Fix permissions on the actual anchor binary (not just the wrapper)
-          ANCHOR_WRAPPER="$(command -v anchor)"
-          echo "anchor wrapper: $ANCHOR_WRAPPER"
-          chmod +x "$ANCHOR_WRAPPER" || true
-          # The actual binary is in the lib directory
-          ANCHOR_LIB_BIN="$(dirname "$ANCHOR_WRAPPER")/../lib/node_modules/@coral-xyz/anchor-cli/anchor"
-          if [ -f "$ANCHOR_LIB_BIN" ]; then
-            chmod +x "$ANCHOR_LIB_BIN"
-            echo "Fixed permissions on: $ANCHOR_LIB_BIN"
-          fi
-          # Ensure cargo bin is on the PATH for subsequent steps
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          "$ANCHOR_WRAPPER" --version
+          # Install Anchor CLI via cargo from crates.io (builds actual binary, avoids version mismatch)
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install 0.31.1
+          avm use 0.31.1
+          echo "$HOME/.avm/bin" >> $GITHUB_PATH
+          export PATH="$HOME/.avm/bin:$PATH"
+          anchor --version
 
       - name: Build & deploy Anchor program
         run: |
           set -euxo pipefail
           export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899
           export ANCHOR_WALLET=deploy_keypair.json
-          # Use the already installed anchor CLI
-          export PATH="$HOME/.cargo/bin:/usr/local/bin:$PATH"
-          ANCHOR_BIN="$(command -v anchor)"
-          echo "Using anchor binary: $ANCHOR_BIN"
-          "$ANCHOR_BIN" --version
+          export PATH="$HOME/.avm/bin:$HOME/.cargo/bin:$PATH"
           
-          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build
+          echo "Using anchor: $(command -v anchor)"
+          anchor --version
+          
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build
           # Try deploy; if it fails (already deployed), continue
-          "$ANCHOR_BIN" deploy --provider.cluster localnet || true
+          anchor deploy --provider.cluster localnet || true
           PROGRAM_KEYPAIR=target/deploy/proof_of_personhood-keypair.json
           if [ -f "$PROGRAM_KEYPAIR" ]; then
             VERIFIER_PROGRAM_ID=$(solana-keygen pubkey $PROGRAM_KEYPAIR)
