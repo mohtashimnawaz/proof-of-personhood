@@ -115,8 +115,9 @@ jobs:
           RUSTUP_TOOLCHAIN: "1.92.0"
         run: |
           set -o pipefail
-          # Explicitly prepend cargo bin to PATH to override Solana's bundled rust
+          # Explicitly prepend cargo bin to PATH and use rustup override to force correct toolchain
           export PATH="${HOME}/.cargo/bin:$PATH"
+          rustup override set 1.92.0
           
           echo "=== Rust toolchain diagnostics ==="
           echo "PATH=$PATH"
