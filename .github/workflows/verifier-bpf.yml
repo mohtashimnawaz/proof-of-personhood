@@ -122,9 +122,9 @@ jobs:
 
           # Temporarily rename rust-toolchain.toml to prevent version conflicts
           mv rust-toolchain.toml rust-toolchain.toml.bak
-          # Override any toolchain files to ensure we use the nightly version
-          export RUSTUP_TOOLCHAIN=nightly-2024-12-01
-          # Ensure we override to a modern stable toolchain for the SBF build
+          # Ensure rust 1.92 is installed and active for the build
+          rustup toolchain install 1.92.0 || true
+          rustup override set 1.92.0 || true
           export RUSTUP_TOOLCHAIN=1.92.0
           RUSTUP_TOOLCHAIN=1.92.0 CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build
           # Restore the toolchain file
