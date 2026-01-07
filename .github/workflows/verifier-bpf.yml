@@ -61,13 +61,19 @@ jobs:
           # Install Anchor CLI via npm (more reliable than cargo install from git)
           export PATH="$HOME/.cargo/bin:$PATH"
           npm install -g @coral-xyz/anchor-cli@0.31.1
-          # Ensure anchor is executable
-          chmod +x "$(command -v anchor)" || true
+          # Fix permissions on the actual anchor binary (not just the wrapper)
+          ANCHOR_WRAPPER="$(command -v anchor)"
+          echo "anchor wrapper: $ANCHOR_WRAPPER"
+          chmod +x "$ANCHOR_WRAPPER" || true
+          # The actual binary is in the lib directory
+          ANCHOR_LIB_BIN="$(dirname "$ANCHOR_WRAPPER")/../lib/node_modules/@coral-xyz/anchor-cli/anchor"
+          if [ -f "$ANCHOR_LIB_BIN" ]; then
+            chmod +x "$ANCHOR_LIB_BIN"
+            echo "Fixed permissions on: $ANCHOR_LIB_BIN"
+          fi
           # Ensure cargo bin is on the PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          ANCHOR_BIN="$(command -v anchor || true)"
-          echo "anchor binary: $ANCHOR_BIN"
-          "$ANCHOR_BIN" --version
+          "$ANCHOR_WRAPPER" --version
 
       - name: Build verifier program for BPF
         env:
@@ -153,12 +159,19 @@ jobs:
           # Install Anchor CLI via npm
           export PATH="$HOME/.cargo/bin:$PATH"
           npm install -g @coral-xyz/anchor-cli@0.31.1
-          chmod +x "$(command -v anchor)" || true
+          # Fix permissions on the actual anchor binary (not just the wrapper)
+          ANCHOR_WRAPPER="$(command -v anchor)"
+          echo "anchor wrapper: $ANCHOR_WRAPPER"
+          chmod +x "$ANCHOR_WRAPPER" || true
+          # The actual binary is in the lib directory
+          ANCHOR_LIB_BIN="$(dirname "$ANCHOR_WRAPPER")/../lib/node_modules/@coral-xyz/anchor-cli/anchor"
+          if [ -f "$ANCHOR_LIB_BIN" ]; then
+            chmod +x "$ANCHOR_LIB_BIN"
+            echo "Fixed permissions on: $ANCHOR_LIB_BIN"
+          fi
           # Ensure cargo bin is on the PATH for subsequent steps
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          ANCHOR_BIN="$(command -v anchor || true)"
-          echo "anchor binary: $ANCHOR_BIN"
-          "$ANCHOR_BIN" --version
+          "$ANCHOR_WRAPPER" --version
 
       - name: Build & deploy Anchor program
         run: |
