@@ -28,10 +28,10 @@ jobs:
 
       - name: Install Solana CLI
         run: |
+          # Prepend cargo bin FIRST to ensure our Rust toolchain takes precedence
+          echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
           curl -sSfL https://release.solana.com/stable/install | sh
           echo "${HOME}/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
-          # Ensure our rustup-installed cargo/rustc is first in PATH (before Solana's bundled rust)
-          echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
 
       - name: Install Anchor CLI (verbose / resilient)
         run: |
