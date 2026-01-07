@@ -90,6 +90,8 @@ jobs:
           rm -f anchor_version.txt
 
       - name: Build verifier program for BPF
+        env:
+          RUSTUP_TOOLCHAIN: "1.92.0"
         run: |
           # Ensure anchor CLI is installed and pick binary
           if ! cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor; then
@@ -124,6 +126,7 @@ jobs:
           echo "Active toolchain:"
           rustc --version
           cargo --version
+          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
           # Run anchor build
           CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build
 

@@ -110,18 +110,20 @@ jobs:
       - name: Run anchor build and check SBF stack usage
         env:
           RUSTFLAGS: "-C target-cpu=native"
+          RUSTUP_TOOLCHAIN: "1.92.0"
         run: |
           set -o pipefail
           # Verify we're using rust 1.92.0 (set by actions-rs/toolchain step)
           echo "Active toolchain:"
           rustc --version
           cargo --version
+          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
 
           # Use resolved anchor binary (prefer cargo-installed or local npm fallback)
           ANCHOR_BIN="$(command -v anchor || true)"
           echo "Using anchor binary for build: $ANCHOR_BIN"
           if [ -n "$ANCHOR_BIN" ]; then
-            # Run anchor build
+            # Run anchor build with explicit toolchain
             CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build 2>&1 | tee build.log || true
           else
             echo "No anchor binary found; aborting build step" >&2

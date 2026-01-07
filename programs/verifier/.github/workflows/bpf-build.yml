@@ -105,10 +105,13 @@ jobs:
           rm -f anchor_version.txt
 
       - name: Build verifier program (Anchor)
+        env:
+          RUSTUP_TOOLCHAIN: "1.92.0"
         run: |
           # Verify toolchain (set by actions-rs/toolchain step)
           echo "Active toolchain:"
           rustc --version
           cargo --version
+          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
           # Run anchor build at workspace root and output SBF to the program dist directory
           CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build -- --sbf-out-dir ./programs/verifier/dist
