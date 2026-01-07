@@ -112,12 +112,7 @@ jobs:
           RUSTFLAGS: "-C target-cpu=native"
         run: |
           set -o pipefail
-          # Ensure we are using a modern rust toolchain for the build (some deps require >= 1.76)
-          echo "Ensuring rust toolchain is 1.92.0"
-          rustup set profile minimal
-          rustup toolchain install 1.92.0
-          rustup default 1.92.0
-          export RUSTUP_TOOLCHAIN=1.92.0
+          # Verify we're using rust 1.92.0 (set by actions-rs/toolchain step)
           echo "Active toolchain:"
           rustc --version
           cargo --version
@@ -126,8 +121,8 @@ jobs:
           ANCHOR_BIN="$(command -v anchor || true)"
           echo "Using anchor binary for build: $ANCHOR_BIN"
           if [ -n "$ANCHOR_BIN" ]; then
-            # Ensure anchor build uses the pinned toolchain
-            RUSTUP_TOOLCHAIN=1.92.0 CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build 2>&1 | tee build.log || true
+            # Run anchor build
+            CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build 2>&1 | tee build.log || true
           else
             echo "No anchor binary found; aborting build step" >&2
             exit 1

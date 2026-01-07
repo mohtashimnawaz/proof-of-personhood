@@ -23,16 +23,16 @@ jobs:
           export PATH="/tmp/solana-release/bin:$PATH"
           solana --version
 
-      - name: Setup rust toolchain (use nightly to support lockfile v4)
+      - name: Setup rust toolchain 1.92.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: 1.92.0
           override: true
+          profile: minimal
           components: rust-src
 
-      - name: Ensure nightly is default and debug
+      - name: Verify toolchain
         run: |
-          rustup default nightly
           rustup show
           rustc --version
           cargo --version
@@ -106,13 +106,9 @@ jobs:
 
       - name: Build verifier program (Anchor)
         run: |
-          # Ensure rust 1.92 is installed and active for the build
-          rustup set profile minimal
-          rustup toolchain install 1.92.0
-          rustup default 1.92.0
-          export RUSTUP_TOOLCHAIN=1.92.0
+          # Verify toolchain (set by actions-rs/toolchain step)
           echo "Active toolchain:"
           rustc --version
           cargo --version
           # Run anchor build at workspace root and output SBF to the program dist directory
-          RUSTUP_TOOLCHAIN=1.92.0 CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build -- --sbf-out-dir ./programs/verifier/dist
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build -- --sbf-out-dir ./programs/verifier/dist

@@ -23,16 +23,16 @@ jobs:
           solana --version
           cargo build-bpf --version
 
-      - name: Setup rust toolchain (use nightly to support lockfile v4)
+      - name: Setup rust toolchain 1.92.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2024-12-01
+          toolchain: 1.92.0
           override: true
+          profile: minimal
           components: rust-src
 
-      - name: Ensure nightly is default and debug
+      - name: Verify toolchain and configure cargo
         run: |
-          rustup default nightly-2024-12-01
           rustup show
           rustc --version
           cargo --version
@@ -120,19 +120,12 @@ jobs:
           fi
           echo "Using anchor binary: $ANCHOR_BIN"
 
-          # Temporarily rename rust-toolchain.toml to prevent version conflicts
-          mv rust-toolchain.toml rust-toolchain.toml.bak
-          # Ensure rust 1.92 is installed and active for the build
-          rustup set profile minimal
-          rustup toolchain install 1.92.0
-          rustup default 1.92.0
-          export RUSTUP_TOOLCHAIN=1.92.0
+          # Verify toolchain (set by actions-rs/toolchain step)
           echo "Active toolchain:"
           rustc --version
           cargo --version
-          RUSTUP_TOOLCHAIN=1.92.0 CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build
-          # Restore the toolchain file
-          mv rust-toolchain.toml.bak rust-toolchain.toml
+          # Run anchor build
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build
 
   e2e:
     runs-on: ubuntu-latest
