@@ -35,6 +35,9 @@ jobs:
 
       - name: Verify toolchain and configure cargo
         run: |
+          # Force PATH to prioritize rustup toolchain
+          export PATH="${HOME}/.cargo/bin:$PATH"
+          rustup default 1.92.0
           rustup show
           rustc --version
           cargo --version
@@ -44,6 +47,10 @@ jobs:
       - name: Run Rust unit & integration tests
         run: |
           set -euxo pipefail
+          # Ensure correct Rust toolchain is used
+          export PATH="${HOME}/.cargo/bin:$PATH"
+          export RUSTUP_TOOLCHAIN="1.92.0"
+          rustc --version
           # Run prover and verifier tests to validate end-to-end flow
           cargo test -p prover --tests -- --nocapture
           cargo test -p verifier --tests -- --nocapture
@@ -94,7 +101,12 @@ jobs:
       - name: Build verifier program for BPF
         env:
           RUSTUP_TOOLCHAIN: "1.92.0"
+          PATH: "${HOME}/.cargo/bin:$PATH"
         run: |
+          # Force correct Rust toolchain
+          export PATH="${HOME}/.cargo/bin:$PATH"
+          export RUSTUP_TOOLCHAIN="1.92.0"
+          rustup default 1.92.0
           # Ensure anchor CLI is installed and pick binary
           if ! cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor; then
             TMP_ANCHOR_DIR="$(mktemp -d)"
@@ -126,6 +138,8 @@ jobs:
 
           # Explicitly prepend cargo bin to PATH to override Solana's bundled rust
           export PATH="${HOME}/.cargo/bin:$PATH"
+          export RUSTUP_TOOLCHAIN="1.92.0"
+          rustup default 1.92.0
           
           echo "=== Rust toolchain diagnostics ==="
           echo "PATH=$PATH"
