@@ -124,11 +124,17 @@ jobs:
           fi
           echo "Using anchor binary: $ANCHOR_BIN"
 
-          # Verify toolchain (set by actions-rs/toolchain step)
-          echo "Active toolchain:"
+          # Explicitly prepend cargo bin to PATH to override Solana's bundled rust
+          export PATH="${HOME}/.cargo/bin:$PATH"
+          
+          echo "=== Rust toolchain diagnostics ==="
+          echo "PATH=$PATH"
+          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
+          which rustc
+          which cargo
           rustc --version
           cargo --version
-          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
+          
           # Run anchor build
           CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build
 

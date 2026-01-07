@@ -115,11 +115,16 @@ jobs:
           RUSTUP_TOOLCHAIN: "1.92.0"
         run: |
           set -o pipefail
-          # Verify we're using rust 1.92.0 (set by actions-rs/toolchain step)
-          echo "Active toolchain:"
+          # Explicitly prepend cargo bin to PATH to override Solana's bundled rust
+          export PATH="${HOME}/.cargo/bin:$PATH"
+          
+          echo "=== Rust toolchain diagnostics ==="
+          echo "PATH=$PATH"
+          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
+          which rustc
+          which cargo
           rustc --version
           cargo --version
-          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
 
           # Use resolved anchor binary (prefer cargo-installed or local npm fallback)
           ANCHOR_BIN="$(command -v anchor || true)"
