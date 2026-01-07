@@ -114,9 +114,11 @@ jobs:
           set -o pipefail
           # Ensure we are using a modern rust toolchain for the build (some deps require >= 1.76)
           echo "Ensuring rust toolchain is 1.92.0"
-          rustup set profile minimal || true
-          rustup toolchain install 1.92.0 || true
-          rustup default 1.92.0 || rustup override set 1.92.0 || true
+          rustup set profile minimal
+          rustup toolchain install 1.92.0
+          rustup default 1.92.0
+          export RUSTUP_TOOLCHAIN=1.92.0
+          echo "Active toolchain:"
           rustc --version
           cargo --version
 

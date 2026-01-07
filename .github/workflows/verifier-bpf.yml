@@ -123,9 +123,13 @@ jobs:
           # Temporarily rename rust-toolchain.toml to prevent version conflicts
           mv rust-toolchain.toml rust-toolchain.toml.bak
           # Ensure rust 1.92 is installed and active for the build
-          rustup toolchain install 1.92.0 || true
-          rustup override set 1.92.0 || true
+          rustup set profile minimal
+          rustup toolchain install 1.92.0
+          rustup default 1.92.0
           export RUSTUP_TOOLCHAIN=1.92.0
+          echo "Active toolchain:"
+          rustc --version
+          cargo --version
           RUSTUP_TOOLCHAIN=1.92.0 CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build
           # Restore the toolchain file
           mv rust-toolchain.toml.bak rust-toolchain.toml

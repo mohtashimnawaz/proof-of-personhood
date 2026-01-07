@@ -107,8 +107,12 @@ jobs:
       - name: Build verifier program (Anchor)
         run: |
           # Ensure rust 1.92 is installed and active for the build
-          rustup toolchain install 1.92.0 || true
-          rustup override set 1.92.0 || true
+          rustup set profile minimal
+          rustup toolchain install 1.92.0
+          rustup default 1.92.0
           export RUSTUP_TOOLCHAIN=1.92.0
+          echo "Active toolchain:"
+          rustc --version
+          cargo --version
           # Run anchor build at workspace root and output SBF to the program dist directory
           RUSTUP_TOOLCHAIN=1.92.0 CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build -- --sbf-out-dir ./programs/verifier/dist
