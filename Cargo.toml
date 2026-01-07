@@ -1,9 +1,13 @@
 [workspace]
 members = [
     "programs/proof-of-personhood",
-    "programs/verifier"
+    "programs/verifier",
+    "tools/prover"
 ]
 resolver = "2"
+
+[patch.crates-io]
+ark-ec = { path = "vendor/ark-ec-0.3.0" }
 
 [profile.release]
 overflow-checks = true

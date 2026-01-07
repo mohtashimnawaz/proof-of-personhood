@@ -20,19 +20,21 @@ jobs:
           wget -q "https://github.com/solana-labs/solana/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" -O solana-release.tar.bz2
           tar jxf solana-release.tar.bz2
           echo "/tmp/solana-release/bin" >> $GITHUB_PATH
-          export PATH="/tmp/solana-release/bin:$PATH"
+          # Ensure our rustup-installed cargo/rustc is first in PATH (before Solana's bundled rust)
+          echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+          export PATH="${HOME}/.cargo/bin:/tmp/solana-release/bin:$PATH"
           solana --version
 
-      - name: Setup rust toolchain (use nightly to support lockfile v4)
+      - name: Setup rust toolchain 1.92.0
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: 1.92.0
           override: true
+          profile: minimal
           components: rust-src
 
-      - name: Ensure nightly is default and debug
+      - name: Verify toolchain
         run: |
-          rustup default nightly
           rustup show
           rustc --version
           cargo --version
@@ -45,10 +47,79 @@ jobs:
 
       - name: Install Anchor CLI
         run: |
-          npm install -g @coral-xyz/anchor-cli
-          anchor --version
+          set -euo pipefail
+          # Prefer cargo-installed anchor from a known tag; fallback to npm (with perms fix)
+          export PATH="$HOME/.cargo/bin:$PATH"
+          if ! command -v anchor >/dev/null 2>&1; then
+            # Try crates.io package first, then git with explicit package
+            if ! cargo install anchor-cli --version 0.31.1 --locked --bin anchor 2>/dev/null; then
+              if ! cargo install --git https://github.com/coral-xyz/anchor --package anchor-cli --tag v0.31.1 --locked --bin anchor; then
+                if ! cargo install --git https://github.com/coral-xyz/anchor --package anchor-cli --bin anchor; then
+                  # All cargo install attempts failed; fallback to local npm install
+                  TMP_ANCHOR_DIR="$(mktemp -d)"
+                  npm i --prefix "$TMP_ANCHOR_DIR" @coral-xyz/anchor-cli@0.31.1 || true
+                  if [ -x "$TMP_ANCHOR_DIR/bin/anchor" ]; then
+                    ANCHOR_CAND="$TMP_ANCHOR_DIR/bin/anchor"
+                  elif [ -x "$TMP_ANCHOR_DIR/node_modules/.bin/anchor" ]; then
+                    ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/.bin/anchor"
+                  elif [ -x "$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor" ]; then
+                    ANCHOR_CAND="$TMP_ANCHOR_DIR/node_modules/@coral-xyz/anchor-cli/anchor"
+                  else
+                    ANCHOR_CAND=""
+                  fi
+                  if [ -n "$ANCHOR_CAND" ]; then
+                    chmod +x "$ANCHOR_CAND" || true
+                    TMP_ANCHOR_BIN_DIR="$(dirname "$ANCHOR_CAND")"
+                    export PATH="$TMP_ANCHOR_BIN_DIR:$PATH"
+                    echo "Using local npm anchor at $TMP_ANCHOR_BIN_DIR"
+                  else
+                    echo "Local npm install didn't produce anchor binary; listing $TMP_ANCHOR_DIR"
+                    ls -la "$TMP_ANCHOR_DIR" || true
+                  fi
+                fi
+              fi
+            fi
+          fi
+          # Ensure cargo bin directory is available in subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          ANCHOR_BIN="$(command -v anchor || true)"
+          echo "Using anchor binary: $ANCHOR_BIN"
+          # Attempt to print version; if it fails (EACCES) try chmod underlying path and retry,
+          # otherwise attempt to force-install cargo-built anchor (try without --locked first).
+          if ! "$ANCHOR_BIN" --version 2>&1 | tee anchor_version.txt ; then
+            BINPATH=$(sed -nE 's/.*spawnSync ([^ ]+) EACCES.*/\1/p' anchor_version.txt | head -n1 || true)
+            if [ -n "$BINPATH" ]; then
+              chmod +x "$BINPATH" || true
+              "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+            else
+              chmod +x "$ANCHOR_BIN" || true
+              "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+            fi
+            if ! grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt >/dev/null 2>&1; then
+              cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --bin anchor || \
+              cargo install --git https://github.com/coral-xyz/anchor anchor --tag v0.31.1 --locked --bin anchor || true
+              echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+              ANCHOR_BIN="$(command -v anchor || true)"
+              "$ANCHOR_BIN" --version 2>&1 | tee -a anchor_version.txt || true
+            fi
+          fi
+          grep -E "anchor-cli (0\.(31|32)\.)" anchor_version.txt || (cat anchor_version.txt && exit 1)
+          rm -f anchor_version.txt
 
       - name: Build verifier program (Anchor)
+        env:
+          RUSTUP_TOOLCHAIN: "1.92.0"
         run: |
+          # Explicitly prepend cargo bin to PATH to override Solana's bundled rust
+          export PATH="${HOME}/.cargo/bin:$PATH"
+          
+          echo "=== Rust toolchain diagnostics ==="
+          echo "PATH=$PATH"
+          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
+          which rustc
+          which cargo
+          rustc --version
+          cargo --version
+          
           # Run anchor build at workspace root and output SBF to the program dist directory
-          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build -- --sbf-out-dir ./programs/verifier/dist
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true "$ANCHOR_BIN" build -- --sbf-out-dir ./programs/verifier/dist

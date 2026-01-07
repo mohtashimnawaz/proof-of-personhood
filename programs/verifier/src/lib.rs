@@ -40,19 +40,19 @@ pub fn process_instruction(_program_id: &Pubkey, _accounts: &[AccountInfo], inst
     // Use a byte-slice reader to sequentially deserialize vk, proof, and public inputs
     let mut bytes: &[u8] = instruction_data;
 
-    // Deserialize verifying key
-    let vk = <VerifyingKey<Bn254> as ark_serialize::CanonicalDeserialize>::deserialize_uncompressed(&mut bytes)
+    // Deserialize verifying key (boxed to move large data to heap)
+    let vk = Box::new(<VerifyingKey<Bn254> as ark_serialize::CanonicalDeserialize>::deserialize_uncompressed(&mut bytes)
         .map_err(|_| {
             msg!("Failed to deserialize verifying key");
             VerifierError::DeserializationFailed
-        })?;
+        })?);
 
-    // Deserialize proof
-    let proof = <Proof<Bn254> as ark_serialize::CanonicalDeserialize>::deserialize_uncompressed(&mut bytes)
+    // Deserialize proof (boxed to reduce stack usage)
+    let proof = Box::new(<Proof<Bn254> as ark_serialize::CanonicalDeserialize>::deserialize_uncompressed(&mut bytes)
         .map_err(|_| {
             msg!("Failed to deserialize proof");
             VerifierError::InvalidProofFormat
-        })?;
+        })?);
 
     // Deserialize public inputs until EOF
     let mut public_inputs = Vec::new();
@@ -67,10 +67,9 @@ pub fn process_instruction(_program_id: &Pubkey, _accounts: &[AccountInfo], inst
 
     msg!("Verifying proof with {} public inputs", public_inputs.len());
 
-    // Prepare verifying key and perform Groth16 verification
-    use ark_groth16::prepare_verifying_key;
-    let pvk = prepare_verifying_key(&vk);
-    let is_valid = verify_proof(&pvk, &proof, &public_inputs)
+    // Prepare verifying key and perform Groth16 verification inside a separate frame
+    // to reduce the stack usage of `process_instruction`.
+    let is_valid = verify_in_frame(&*vk, &*proof, &public_inputs)
         .map_err(|_| {
             msg!("Proof verification failed");
             VerifierError::VerificationFailed
@@ -97,4 +96,15 @@ pub fn verify_groth16_native(vk: &VerifyingKey<Bn254>, proof: &Proof<Bn254>, pub
 #[cfg(target_os = "solana")]
 pub fn verify_groth16_native(_vk: &VerifyingKey<Bn254>, _proof: &Proof<Bn254>, _public_inputs: &[Fr]) -> Result<bool, VerifierError> {
     Err(VerifierError::VerificationFailed)
+}
+
+// Verify in a dedicated, non-inlined function to keep large temporaries
+// (like the prepared verifying key and intermediate pairing results)
+// off the stack of `process_instruction`.
+#[inline(never)]
+fn verify_in_frame(vk: &VerifyingKey<Bn254>, proof: &Proof<Bn254>, public_inputs: &[Fr]) -> Result<bool, VerifierError> {
+    use ark_groth16::prepare_verifying_key;
+    // Box the prepared verifying key to move its potentially large contents to the heap
+    let pvk = Box::new(prepare_verifying_key(vk));
+    verify_proof(&*pvk, proof, public_inputs).map_err(|_| VerifierError::VerificationFailed)
 }
