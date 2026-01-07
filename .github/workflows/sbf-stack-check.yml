@@ -32,6 +32,10 @@ jobs:
           echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
           curl -sSfL https://release.solana.com/stable/install | sh
           echo "${HOME}/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+          # Remove Solana's bundled Rust toolchain from PATH to prevent conflicts
+          rm -f "${HOME}/.local/share/solana/install/active_release/bin/cargo" || true
+          rm -f "${HOME}/.local/share/solana/install/active_release/bin/rustc" || true
+          rm -f "${HOME}/.local/share/solana/install/active_release/bin/rustup" || true
 
       - name: Install Anchor CLI (verbose / resilient)
         run: |
@@ -113,8 +117,6 @@ jobs:
         env:
           RUSTFLAGS: "-C target-cpu=native"
           RUSTUP_TOOLCHAIN: "1.92.0"
-          CARGO: "$HOME/.cargo/bin/cargo"
-          RUSTC: "$HOME/.cargo/bin/rustc"
         run: |
           set -o pipefail
           # Explicitly prepend cargo bin to PATH and use rustup override to force correct toolchain
