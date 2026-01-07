@@ -9,21 +9,10 @@ on:
 jobs:
   build-verifier-bpf:
     runs-on: ubuntu-latest
+    env:
+      RUSTUP_TOOLCHAIN: "1.92.0"
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Solana CLI from GitHub releases
-        run: |
-          SOLANA_VERSION="v1.18.26"
-          cd /tmp
-          wget -q "https://github.com/solana-labs/solana/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" -O solana-release.tar.bz2
-          tar jxf solana-release.tar.bz2
-          # Ensure our rustup-installed cargo/rustc is first in PATH (before Solana's bundled rust)
-          echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
-          echo "/tmp/solana-release/bin" >> $GITHUB_PATH
-          export PATH="${HOME}/.cargo/bin:/tmp/solana-release/bin:$PATH"
-          solana --version
-          cargo build-bpf --version
 
       - name: Setup rust toolchain 1.92.0
         uses: actions-rs/toolchain@v1
@@ -33,10 +22,18 @@ jobs:
           profile: minimal
           components: rust-src
 
+      - name: Install Solana CLI from GitHub releases
+        run: |
+          SOLANA_VERSION="v1.18.26"
+          cd /tmp
+          wget -q "https://github.com/solana-labs/solana/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" -O solana-release.tar.bz2
+          tar jxf solana-release.tar.bz2
+          # Add solana to path but keep cargo/rustup first
+          echo "/tmp/solana-release/bin" >> $GITHUB_PATH
+          solana --version
+
       - name: Verify toolchain and configure cargo
         run: |
-          # Force PATH to prioritize rustup toolchain
-          export PATH="${HOME}/.cargo/bin:$PATH"
           rustup default 1.92.0
           rustup show
           rustc --version
@@ -47,46 +44,26 @@ jobs:
       - name: Run Rust unit & integration tests
         run: |
           set -euxo pipefail
-          # Ensure correct Rust toolchain is used
-          export PATH="${HOME}/.cargo/bin:$PATH"
-          export RUSTUP_TOOLCHAIN="1.92.0"
           rustc --version
           # Run prover and verifier tests to validate end-to-end flow
           cargo test -p prover --tests -- --nocapture
           cargo test -p verifier --tests -- --nocapture
 
       - name: Install Anchor CLI
-        env:
-          RUSTUP_TOOLCHAIN: "1.92.0"
         run: |
           set -euo pipefail
-          # Ensure rustup toolchain takes precedence over Solana's bundled rust
-          export PATH="$HOME/.cargo/bin:$PATH"
-          export RUSTUP_TOOLCHAIN="1.92.0"
-          rustup default 1.92.0
           echo "Using rustc: $(rustc --version)"
           # Install Anchor CLI via avm (builds actual binary, avoids version mismatch)
           cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
           avm install 0.31.1
           avm use 0.31.1
           echo "$HOME/.avm/bin" >> $GITHUB_PATH
-          export PATH="$HOME/.avm/bin:$PATH"
           anchor --version
 
       - name: Build verifier program for BPF
-        env:
-          RUSTUP_TOOLCHAIN: "1.92.0"
         run: |
-          # Force correct Rust toolchain
-          export PATH="$HOME/.avm/bin:$HOME/.cargo/bin:$PATH"
-          export RUSTUP_TOOLCHAIN="1.92.0"
-          rustup default 1.92.0
-          
           echo "=== Rust toolchain diagnostics ==="
-          echo "PATH=$PATH"
           echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
-          command -v rustc
-          command -v cargo
           rustc --version
           cargo --version
           
@@ -96,6 +73,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     needs: build-verifier-bpf
+    env:
+      RUSTUP_TOOLCHAIN: "1.92.0"
     steps:
       - uses: actions/checkout@v4
 
@@ -118,10 +97,8 @@ jobs:
           cd /tmp
           wget -q "https://github.com/solana-labs/solana/releases/download/${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2" -O solana-release.tar.bz2
           tar jxf solana-release.tar.bz2
-          # Add Solana to PATH but AFTER cargo bin to preserve our Rust version
-          echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
+          # Add Solana to PATH (rustup toolchain is enforced via RUSTUP_TOOLCHAIN env var)
           echo "/tmp/solana-release/bin" >> $GITHUB_PATH
-          export PATH="${HOME}/.cargo/bin:/tmp/solana-release/bin:$PATH"
           solana --version
 
       - name: Start local validator and fund wallet
@@ -145,21 +122,14 @@ jobs:
           solana airdrop 10 $(solana-keygen pubkey deploy_keypair.json)
 
       - name: Install Anchor CLI
-        env:
-          RUSTUP_TOOLCHAIN: "1.92.0"
         run: |
           set -euo pipefail
-          # Ensure rustup toolchain takes precedence over Solana's bundled rust
-          export PATH="$HOME/.cargo/bin:$PATH"
-          export RUSTUP_TOOLCHAIN="1.92.0"
-          rustup default 1.92.0
           echo "Using rustc: $(rustc --version)"
           # Install Anchor CLI via avm (builds actual binary, avoids version mismatch)
           cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
           avm install 0.31.1
           avm use 0.31.1
           echo "$HOME/.avm/bin" >> $GITHUB_PATH
-          export PATH="$HOME/.avm/bin:$PATH"
           anchor --version
 
       - name: Build & deploy Anchor program
@@ -167,7 +137,6 @@ jobs:
           set -euxo pipefail
           export ANCHOR_PROVIDER_URL=http://127.0.0.1:8899
           export ANCHOR_WALLET=deploy_keypair.json
-          export PATH="$HOME/.avm/bin:$HOME/.cargo/bin:$PATH"
           
           echo "Using anchor: $(command -v anchor)"
           anchor --version
