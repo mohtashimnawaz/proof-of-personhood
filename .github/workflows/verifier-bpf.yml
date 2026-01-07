@@ -9,8 +9,6 @@ on:
 jobs:
   build-verifier-bpf:
     runs-on: ubuntu-latest
-    env:
-      RUSTUP_TOOLCHAIN: "1.92.0"
     steps:
       - uses: actions/checkout@v4
 
@@ -47,16 +45,18 @@ jobs:
           set -euxo pipefail
           rustc --version
           # Run prover and verifier tests to validate end-to-end flow
-          cargo test -p prover --tests -- --nocapture
-          cargo test -p verifier --tests -- --nocapture
+          rustup run 1.92.0 cargo test -p prover --tests -- --nocapture
+          rustup run 1.92.0 cargo test -p verifier --tests -- --nocapture
 
       - name: Install Anchor CLI
         run: |
           set -euo pipefail
-          echo "Using rustc: $(rustc --version)"
-          # Install Anchor CLI via avm (builds actual binary, avoids version mismatch)
-          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          avm install 0.31.1
+          # Explicitly use rustup to run cargo with the correct toolchain
+          rustup run 1.92.0 rustc --version
+          echo "Using rustc: $(rustup run 1.92.0 rustc --version)"
+          # Install Anchor CLI via avm using the correct toolchain
+          rustup run 1.92.0 cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          rustup run 1.92.0 avm install 0.31.1
           avm use 0.31.1
           echo "$HOME/.avm/bin" >> $GITHUB_PATH
           anchor --version
@@ -64,18 +64,15 @@ jobs:
       - name: Build verifier program for BPF
         run: |
           echo "=== Rust toolchain diagnostics ==="
-          echo "RUSTUP_TOOLCHAIN=$RUSTUP_TOOLCHAIN"
           rustc --version
           cargo --version
           
-          # Run anchor build
-          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build
+          # Run anchor build with explicit toolchain
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true rustup run 1.92.0 anchor build
 
   e2e:
     runs-on: ubuntu-latest
     needs: build-verifier-bpf
-    env:
-      RUSTUP_TOOLCHAIN: "1.92.0"
     steps:
       - uses: actions/checkout@v4
 
@@ -126,10 +123,12 @@ jobs:
       - name: Install Anchor CLI
         run: |
           set -euo pipefail
-          echo "Using rustc: $(rustc --version)"
-          # Install Anchor CLI via avm (builds actual binary, avoids version mismatch)
-          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-          avm install 0.31.1
+          # Explicitly use rustup to run cargo with the correct toolchain
+          rustup run 1.92.0 rustc --version
+          echo "Using rustc: $(rustup run 1.92.0 rustc --version)"
+          # Install Anchor CLI via avm using the correct toolchain
+          rustup run 1.92.0 cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          rustup run 1.92.0 avm install 0.31.1
           avm use 0.31.1
           echo "$HOME/.avm/bin" >> $GITHUB_PATH
           anchor --version
@@ -143,7 +142,7 @@ jobs:
           echo "Using anchor: $(command -v anchor)"
           anchor --version
           
-          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true anchor build
+          CARGO_UNSTABLE_NEXT_LOCKFILE_BUMP=true rustup run 1.92.0 anchor build
           # Try deploy; if it fails (already deployed), continue
           anchor deploy --provider.cluster localnet || true
           PROGRAM_KEYPAIR=target/deploy/proof_of_personhood-keypair.json
